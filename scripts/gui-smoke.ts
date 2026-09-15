@@ -34,7 +34,7 @@ import { cwd } from "node:process";
 import type { AddressInfo } from "node:net";
 
 import { Cdp, attachTo, clickReal, pollUntil, requireVisible } from "../../tools/obsidian-cdp/cdp.js";
-import { buildVault, stagingVaultDir } from "../../tools/obsidian-cdp/vault.js";
+import { buildVault, requireEigenerBuild, stagingVaultDir } from "../../tools/obsidian-cdp/vault.js";
 
 const REPO_NAME = "llm-endpoint-manager";
 const PLUGIN_ID = "llm-endpoint-manager";
@@ -190,6 +190,7 @@ async function main(): Promise<void> {
 
   let fake: { url: string; close: () => Promise<void> } | null = null;
   let settings: SettingsStelle | null = null;
+  const warnungen: string[] = [];
 
   try {
     if (process.platform === "darwin") {
@@ -200,9 +201,23 @@ async function main(): Promise<void> {
     }
     await requireVisible(cdp);
 
-    const vaultName = await cdp.evaluate<string>(`return window.app ? app.vault.getName() : "";`);
-    if (!vaultName) throw new Error("Obsidians `app` ist im Renderer nicht erreichbar.");
-    console.log(`Vault: ${vaultName}\n`);
+    const vaultInfo = await cdp.evaluate<{ name: string; basePath: string; configDir: string }>(`
+      return window.app ? { name: app.vault.getName(), basePath: app.vault.adapter.basePath, configDir: app.vault.configDir } : { name: "", basePath: "", configDir: "" };
+    `);
+    if (!vaultInfo.name) throw new Error("Obsidians `app` ist im Renderer nicht erreichbar.");
+    console.log(`Vault: ${vaultInfo.name} (${vaultInfo.basePath})\n`);
+
+    // Build-Herkunft VOR jeder Messung pruefen (CORE-TEST-02 g): ein gruener Lauf gegen einen
+    // Store-Build oder einen veralteten Deploy ist schlimmer als kein Lauf, weil er nicht
+    // untersucht wird (Dach-Lesson 2026-08-30: 69/150 gruene Punkte liefen auf einem
+    // Store-Build, weil `manifest.version` fuer Store- vs. Repo-Build blind ist). Bricht bei
+    // "fehlt"/"store-installiert"/"fremd" hart ab; bei "ungeklaert" (kein Store-Suffix, aber
+    // auch kein sha1-Beweis) sammelt `melde` die Warnung fuer die Abschlusszeile.
+    requireEigenerBuild(
+      join(vaultInfo.basePath, vaultInfo.configDir, "plugins", PLUGIN_ID, "main.js"),
+      join(REPO_ROOT, "main.js"),
+      (m) => warnungen.push(m),
+    );
 
     // --- C1: Restricted-Mode-Guard -------------------------------------------------
     console.log("C · Zweitinstanz-Grundlage");
@@ -230,7 +245,7 @@ async function main(): Promise<void> {
       `)).s;
       geladen = (await cdp.evaluate<{ g: boolean }>(`return { g: Boolean(app.plugins.plugins[${q(PLUGIN_ID)}]) };`)).g;
     }
-    record("C1 Restricted-Mode-Guard (Plugin nach setEnable geladen)", geladen, geladen ? `Vault ${vaultName}${frei ? ` (${frei})` : " (bereits aktiv)"}` : `app.plugins.plugins.${PLUGIN_ID} fehlt — ${frei || "kein Freischaltversuch"}`);
+    record("C1 Restricted-Mode-Guard (Plugin nach setEnable geladen)", geladen, geladen ? `Vault ${vaultInfo.name}${frei ? ` (${frei})` : " (bereits aktiv)"}` : `app.plugins.plugins.${PLUGIN_ID} fehlt — ${frei || "kein Freischaltversuch"}`);
     if (!geladen) throw new Error("Ohne geladenes Plugin ist jeder weitere Punkt gegenstandslos.");
 
     // Frischer Ausgangszustand: alle evtl. vom letzten Lauf verbliebenen Endpunkte weg.
@@ -442,6 +457,9 @@ async function main(): Promise<void> {
     for (const c of failed) console.log(`  - ${c.name}: ${c.detail}`);
     process.exitCode = 1;
   }
+  // Build-Herkunft-Warnung ("ungeklaert") gehoert in die Abschlusszeile, nicht nur nach oben
+  // ins Protokoll — sonst wird sie zwischen neun gruenen Haken uebersehen.
+  for (const w of warnungen) console.log(`\n${w}`);
 }
 
 /** `STAGING_VAULTS_DIR` optional lesen, ohne bei Fehlen zu werfen — A3 prueft `data.json`
