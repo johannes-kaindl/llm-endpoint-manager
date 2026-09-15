@@ -5,7 +5,8 @@ describe("STRINGS", () => {
   it("de hat genau die Schlüssel von en, keiner leer", () => {
     const en = Object.keys(STRINGS.en).sort(); const de = Object.keys(STRINGS.de).sort();
     expect(de).toEqual(en);
-    for (const k of en) { expect(STRINGS.en[k]).toBeTruthy(); expect(STRINGS.de[k]).toBeTruthy(); }
+    const enDict: Record<string, string> = STRINGS.en; const deDict: Record<string, string> = STRINGS.de;
+    for (const k of en) { expect(enDict[k]).toBeTruthy(); expect(deDict[k]).toBeTruthy(); }
   });
   it("kein Fachbegriff ohne Auflösung: 'Endpoint' wird beim ersten Vorkommen erklärt", () => {
     expect(STRINGS.en["set.endpointsDesc"]).toMatch(/server address/i);
