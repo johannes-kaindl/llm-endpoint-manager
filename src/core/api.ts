@@ -46,7 +46,7 @@ function toResolved(m: Materialized): ResolvedEndpoint {
 }
 
 export function createManagerApi(deps: ApiDeps): ManagerApiHandle {
-  const reachability = createReachabilityCache(deps.now);
+  const reachability = createReachabilityCache(() => deps.now());
   const models = createModelListCache();
   const listeners = new Set<() => void>();
   const callers: CallerRecord[] = [];
@@ -90,7 +90,7 @@ export function createManagerApi(deps: ApiDeps): ManagerApiHandle {
       return [...r.models].sort();
     },
     async importEndpoints(eps: EndpointConfig[], capability) {
-      const out = importEndpoints(deps.settings().endpoints, eps, capability, deps.mint, (sid) => deps.secrets.has(sid));
+      const out = importEndpoints(deps.settings().endpoints, eps, capability, () => deps.mint(), (sid) => deps.secrets.has(sid));
       for (const s of out.secrets) deps.secrets.set(s.secretId, s.value);
       await deps.replaceSettings(toPersisted({ version: 1, endpoints: out.endpoints }));
       for (const e of out.endpoints) reachability.invalidate(e.url);
