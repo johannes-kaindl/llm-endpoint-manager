@@ -4,8 +4,16 @@ import { secretIdFor } from "../vendor/kit/secrets";
 import type { Provider, Capability } from "../vendor/kit/endpoint-source";
 
 export type { Provider, Capability } from "../vendor/kit/endpoint-source";
-export const PROVIDERS: readonly Provider[] = ["openai", "ollama", "a1111", "comfy"];
-export const CAPABILITIES: readonly Capability[] = ["chat", "embedding", "vision", "image"];
+
+/** `as const satisfies` statt eines Laufzeit-Arrays über dem Typ: erweitert ein Re-Vendoring die
+ *  `Provider`/`Capability`-Union der Kit-Quelle, bricht der Compiler HIER statt still einen
+ *  unbekannten Wert in `normalizeEndpointEntry` auf "openai" herunterzustufen bzw. im
+ *  Settings-Dropdown wegzulassen (Finding 3, Whole-Branch-Review). */
+export const PROVIDERS = ["openai", "ollama", "a1111", "comfy"] as const satisfies readonly Provider[];
+export type _AlleProviderAbgedeckt = Exclude<Provider, (typeof PROVIDERS)[number]> extends never ? true : never;
+
+export const CAPABILITIES = ["chat", "embedding", "vision", "image"] as const satisfies readonly Capability[];
+export type _AlleCapabilityAbgedeckt = Exclude<Capability, (typeof CAPABILITIES)[number]> extends never ? true : never;
 
 /** Ein Endpunkt des Managers. `extends EndpointConfig`, damit der Kit-Listen-Editor
  *  (buildEndpointList<T>) URL, Reihenfolge und Modell unverändert bedient — `model` ist hier das

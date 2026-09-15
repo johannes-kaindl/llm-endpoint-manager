@@ -64,32 +64,13 @@ Other plugins reach this plugin's API at `app.plugins.plugins["llm-endpoint-mana
 **Read the API object fresh on every call — never cache it** — the plugin can be disabled at
 any time, in which case `app.plugins.plugins["llm-endpoint-manager"]` is `undefined`.
 
-The contract (`src/core/api-types.ts`):
-
-```ts
-const LLM_ENDPOINT_MANAGER_API_VERSION = 1;
-
-type ApiErrorCode = "no-endpoint" | "not-found" | "disabled" | "secret-missing" | "unreachable";
-interface ApiError { error: ApiErrorCode }
-
-interface ApiEndpoint {
-  id: string; label: string; url: string; provider: Provider; capabilities: Capability[];
-  defaultModel?: string; enabled: boolean; hasSecret: boolean;
-}
-interface ResolvedEndpoint { id: string; label: string; config: EndpointConfig; defaultModel?: string }
-interface ImportResult { added: string[]; merged: string[]; skipped: string[] }
-
-interface LlmEndpointManagerApi {
-  version: 1;
-  list(filter?: { capability?: Capability }): ApiEndpoint[];
-  get(id: string): ApiEndpoint | null;
-  resolve(capability: Capability, opts?: { caller?: string }): Promise<ResolvedEndpoint | ApiError>;
-  materialize(id: string, opts?: { caller?: string }): Promise<ResolvedEndpoint | ApiError>;
-  models(id: string, opts?: { force?: boolean }): Promise<string[] | ApiError>;
-  importEndpoints(eps: EndpointConfig[], capability: Capability): Promise<ImportResult | ApiError>;
-  on(event: "changed", cb: () => void): () => void;
-}
-```
+The contract is vendored into `src/vendor/kit/endpoint-source.ts` (from `obsidian-kit`'s
+`endpoint-source` module, re-exported unchanged by `src/core/api-types.ts`) — see that file for
+the full `LlmEndpointManagerApi` interface (`version`, `list`, `get`, `resolve`, `materialize`,
+`models`, `importEndpoints`, `on`), the `ApiEndpoint`/`ResolvedEndpoint`/`ImportResult` shapes and
+the `ApiErrorCode` union. It also exports `LLM_ENDPOINT_MANAGER_PLUGIN_ID`
+(`"llm-endpoint-manager"`), the id this plugin registers itself under in
+`app.plugins.plugins[...]`.
 
 - `Provider` is `"openai" | "ollama" | "a1111" | "comfy"`, `Capability` is
   `"chat" | "embedding" | "vision" | "image"`.
