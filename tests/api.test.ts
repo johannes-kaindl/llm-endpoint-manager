@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { createManagerApi, type ApiDeps } from "../src/core/api";
 import { loadSettings, type ManagerSettings } from "../src/core/model";
 import { MemorySecretStore } from "../src/vendor/kit/secrets";
+import { LLM_ENDPOINT_MANAGER_API_VERSION } from "../src/core/api-types";
 
 function deps(initial: ManagerSettings, over: Partial<ApiDeps> = {}) {
   let settings = initial;
@@ -99,5 +100,11 @@ describe("createManagerApi", () => {
     const { d } = deps(base(), { probe: () => Promise.reject(new Error("boom")) });
     const { api } = createManagerApi(d);
     expect(await api.resolve("chat")).toEqual({ error: "no-endpoint" });
+  });
+});
+
+describe("api-types Re-Export", () => {
+  it("LLM_ENDPOINT_MANAGER_API_VERSION kommt aus dem gevendorten Kit-Modul — eine Quelle", () => {
+    expect(LLM_ENDPOINT_MANAGER_API_VERSION).toBe(1);
   });
 });

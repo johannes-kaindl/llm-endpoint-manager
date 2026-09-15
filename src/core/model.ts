@@ -1,9 +1,9 @@
 import { mergeSettings } from "../vendor/kit/settings";
 import type { EndpointConfig } from "../vendor/kit/endpoint_config";
 import { secretIdFor } from "../vendor/kit/secrets";
+import type { Provider, Capability } from "../vendor/kit/endpoint-source";
 
-export type Provider = "openai" | "ollama" | "a1111" | "comfy";
-export type Capability = "chat" | "embedding" | "vision" | "image";
+export type { Provider, Capability } from "../vendor/kit/endpoint-source";
 export const PROVIDERS: readonly Provider[] = ["openai", "ollama", "a1111", "comfy"];
 export const CAPABILITIES: readonly Capability[] = ["chat", "embedding", "vision", "image"];
 
