@@ -13,7 +13,7 @@ KIT="${KIT_DIR:-../obsidian-kit}"
 # obsidian-kit traegt unter src/vendor/code-kit/ eigene Kopien einiger Module; die werden hier
 # bewusst NICHT genommen. Eine Zwischenkopie als Quelle zu nehmen erzeugt eine Kopier-Kette,
 # und die sieht bei der naechsten Zaehlung wie ein unabhaengiger Beleg aus.
-CODE_KIT="${CODE_KIT_DIR:-../../code-kit}"
+CODE_KIT="${CODE_KIT_DIR:-../../libs/code-kit}"
 [ -d "$KIT/src/pure" ] || { echo "Kit nicht gefunden unter $KIT (KIT_DIR setzen)" >&2; exit 1; }
 [ -d "$CODE_KIT/src/ts" ] || { echo "code-kit nicht gefunden unter $CODE_KIT (CODE_KIT_DIR setzen)" >&2; exit 1; }
 # CORE-META-22: gelesen wird aus einer FESTEN REF, nicht aus dem Arbeitsstand des
