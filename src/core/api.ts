@@ -91,10 +91,20 @@ export function createManagerApi(deps: ApiDeps): ManagerApiHandle {
     },
     async importEndpoints(eps: EndpointConfig[], capability) {
       const out = importEndpoints(deps.settings().endpoints, eps, capability, () => deps.mint(), (sid) => deps.secrets.has(sid));
-      for (const s of out.secrets) deps.secrets.set(s.secretId, s.value);
+      // Reihenfolge bewusst: erst die Settings persistieren (secretId-Zuordnung steht damit fest),
+      // DANN die Secrets schreiben — scheitert das Secret-Schreiben, verweist trotzdem kein Eintrag
+      // auf ein Token, das nie im Schlüsselbund landete (umgekehrt wäre ein Secret verwaist, wenn
+      // replaceSettings scheitert). `obsidianSecretStore.set` wirft absichtlich bei einem Schlüsselbund,
+      // der den Wert nicht persistiert; ein Konsument, der laut Vertrag "error" in result statt
+      // try/catch prüft, darf das nie als unbehandelte Rejection sehen.
       await deps.replaceSettings(toPersisted({ version: 1, endpoints: out.endpoints }));
       for (const e of out.endpoints) reachability.invalidate(e.url);
       notifyChanged();
+      try {
+        for (const s of out.secrets) deps.secrets.set(s.secretId, s.value);
+      } catch {
+        return { error: "secret-missing" } satisfies ApiError;
+      }
       return out.result satisfies ImportResult;
     },
     on(_event, cb) { listeners.add(cb); return () => { listeners.delete(cb); }; },

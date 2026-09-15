@@ -101,8 +101,10 @@ interface LlmEndpointManagerApi {
   wants "something that can do `chat`".
 - `materialize(id)` resolves one specific endpoint the caller already knows about (e.g. one the
   user picked explicitly).
-- `models(id)` lists the models a specific endpoint currently reports (cached ~30 s so that
-  twelve plugins asking about the same server don't send twelve requests).
+- `models(id)` lists the models a specific endpoint currently reports (cached until the endpoint
+  changes or `force: true` is passed — the list does not expire on its own; `resolve()`/
+  `materialize()` use a separate 30 s reachability cache, so twelve plugins asking about the
+  same server don't send twelve requests).
 - `importEndpoints` lets a caller (e.g. a migration from an older, plugin-local endpoint list)
   add or merge endpoint configs in bulk, including their secret values.
 - `on("changed", cb)` subscribes to endpoint list changes and returns an unsubscribe function.

@@ -74,6 +74,27 @@ describe("createManagerApi", () => {
     h.notifyChanged();
     expect(cb).toHaveBeenCalledTimes(1);
   });
+  it("importEndpoints wirft nie, wenn secrets.set wirft — gibt secret-missing als Wert zurück", async () => {
+    const throwingSecrets: import("../src/core/api").ApiDeps["secrets"] = {
+      get: () => null, has: () => false,
+      set: () => { throw new Error("Obsidian SecretStorage did not persist"); },
+      delete: () => { /* unbenutzt */ },
+    };
+    const { d } = deps(base(), { secrets: throwingSecrets });
+    const { api } = createManagerApi(d);
+    await expect(api.importEndpoints([{ url: "http://c", apiKey: "sk-c" }], "vision")).resolves.toEqual({ error: "secret-missing" });
+  });
+  it("importEndpoints: replaceSettings ist abgeschlossen, bevor Secrets geschrieben werden — kein verwaistes Secret nach Teilausfall", async () => {
+    const order: string[] = [];
+    const { d, secrets } = deps(base(), {
+      replaceSettings: async () => { order.push("settings"); },
+    });
+    const originalSet = secrets.set.bind(secrets);
+    secrets.set = (id: string, value: string) => { order.push("secret"); originalSet(id, value); };
+    const { api } = createManagerApi(d);
+    await api.importEndpoints([{ url: "http://c", apiKey: "sk-c" }], "vision");
+    expect(order).toEqual(["settings", "secret"]);
+  });
   it("Fehler in probe werden als unreachable-Cache-Eintrag behandelt, nicht geworfen", async () => {
     const { d } = deps(base(), { probe: () => Promise.reject(new Error("boom")) });
     const { api } = createManagerApi(d);
