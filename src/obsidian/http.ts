@@ -14,10 +14,22 @@ type Wire = { status: number; text: string; timedOut: boolean; error: string | n
 /** `window` statt `activeWindow` als Timer-Port: der Timer berührt kein DOM, die Popout-Regel
  *  zielt auf DOM-gebundene Timer, und `obsidianmd/prefer-window-timers` verlangt hier
  *  ausdrücklich `window`. */
+function toWireError(err: unknown): Wire {
+  return { status: 0, text: "", timedOut: false, error: err instanceof Error ? err.message : String(err) };
+}
+
 async function send(url: string, timeoutMs: number, headers?: Record<string, string>): Promise<Wire> {
-  const work = requestUrl({ url, method: "GET", headers, throw: false })
-    .then((res) => ({ status: res.status, text: res.text, timedOut: false, error: null }))
-    .catch((err: unknown) => ({ status: 0, text: "", timedOut: false, error: err instanceof Error ? err.message : String(err) }));
+  // requestUrl(...) selbst kann synchron werfen (nicht nur seine Promise ablehnen) — z. B. bei
+  // einer ungueltigen URL. Ohne dieses try/catch verliesse ein solcher Wurf send() ungefangen
+  // und verletzte den Vertrag "Fehler sind Werte, keine Wuerfe" der Aufrufer (probeStatus/listModels).
+  let work: Promise<Wire>;
+  try {
+    work = requestUrl({ url, method: "GET", headers, throw: false })
+      .then((res) => ({ status: res.status, text: res.text, timedOut: false, error: null }))
+      .catch((err: unknown) => toWireError(err));
+  } catch (err) {
+    return toWireError(err);
+  }
   const raced = await withTimeout(work, timeoutMs, window);
   return raced.timedOut ? { status: 0, text: "", timedOut: true, error: null } : raced.value;
 }

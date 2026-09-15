@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, beforeAll, afterAll } from "vitest";
 import { requestUrl } from "obsidian";
 import { listModels, probeStatus } from "../src/obsidian/http";
+import { classifyEndpointStatus } from "../src/vendor/kit/endpoint_diagnostics";
 
 // Der vendorte Obsidian-Mock (tests/vendor/kit/obsidian-mock.ts) baut `requestUrl` mit einem
 // eigenen, dependency-freien Spy-Helfer (`fn`/`MockFn`), nicht mit `vi.fn` — er kennt deshalb
@@ -13,6 +14,7 @@ interface MockFnLike {
   mockClear(): void;
   mockResolvedValue(v: unknown): void;
   mockRejectedValue(v: unknown): void;
+  mockImplementation(impl: (...args: unknown[]) => unknown): void;
 }
 const rq = requestUrl as unknown as MockFnLike;
 beforeEach(() => { rq.mockClear(); });
@@ -56,5 +58,25 @@ describe("probeStatus/listModels", () => {
     rq.mockRejectedValue(new Error("ECONNREFUSED"));
     expect((await probeStatus({ url: "http://h" }, "openai", 100)).reachable).toBe(false);
     expect(await listModels({ url: "http://h" }, "openai", 100)).toEqual([]);
+  });
+  it("synchroner Wurf von requestUrl selbst → nicht erreichbar, leere Liste, kein Wurf", async () => {
+    // requestUrl(...) kann synchron werfen (bevor .then()/.catch() angehaengt sind) — anders als
+    // ein rejected Promise, das mockRejectedValue simuliert. Deckt src/obsidian/http.ts' send().
+    rq.mockImplementation(() => { throw new Error("sync boom"); });
+    expect((await probeStatus({ url: "http://h" }, "openai", 100)).reachable).toBe(false);
+    expect(await listModels({ url: "http://h" }, "openai", 100)).toEqual([]);
+  });
+  it("a1111/comfy-klartext bei 2xx ist an classifyEndpointStatus['ok'] gebunden, kein freistehendes Literal", async () => {
+    // http.ts kann KLARTEXT nicht importieren (privates const in endpoint_diagnostics.ts) und
+    // traegt den Text deshalb als eigenes Literal — dieser Test verriegelt beide Werte gegeneinander,
+    // damit ein Re-Vendoring mit geaendertem KLARTEXT["ok"] hier sichtbar auseinanderlaeuft statt
+    // lautlos zu driften.
+    const referenz = classifyEndpointStatus({ kind: "response", status: 200, body: { data: [] } });
+    expect(referenz.kind).toBe("ok");
+    rq.mockResolvedValue({ status: 200, text: "{}" });
+    const a1111 = await probeStatus({ url: "http://h:7860" }, "a1111", 100);
+    const comfy = await probeStatus({ url: "http://h:8188" }, "comfy", 100);
+    expect(a1111.klartext).toBe(referenz.klartext);
+    expect(comfy.klartext).toBe(referenz.klartext);
   });
 });
