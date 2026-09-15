@@ -6,9 +6,12 @@ Workspace-weite Standards (comply-or-explain): siehe [`../../workspace/_docs/CON
 
 **Profil:** `ts-node` · `obsidian-plugin`.
 
-**Stand 2026-09-15: Gerüst, kein Release.** Repo neu angelegt, Vendoring auf obsidian-kit
-0.36.1 + code-kit 0.6.0, `npm run gate` grün. Für neue Vorhaben gilt: erst Kit-first-Sondierung
-(`../AGENTS.md` + `../REGISTRY.md`), dann `superpowers:brainstorming` → Spec → Plan → TDD.
+**Stand 2026-09-15: 0.1.0 released.** Alle 13 Tasks aus Plan 2 umgesetzt: Kern-Datenmodell,
+Plugin-API v1 (`createManagerApi`, „Fehler sind Werte"), HTTP-Probe, Settings-Tab (Endpunkt-Liste,
+Protokoll/Fähigkeiten/Aktiv-Schalter), i18n, Schlüsselbund-Verdrahtung (`obsidianSecretStore`),
+GUI-Smoke 9/9. Vendoring auf obsidian-kit 0.36.1 + code-kit 0.6.0, `npm run gate` grün. Tag + Forgejo-Release
+für 0.1.0 existieren. Für neue Vorhaben gilt: erst Kit-first-Sondierung (`../AGENTS.md` +
+`../REGISTRY.md`), dann `superpowers:brainstorming` → Spec → Plan → TDD.
 
 ## Project character
 
@@ -35,7 +38,8 @@ je mit Herkunfts-Header in Zeile 1 und `VENDOR.json`. Nie von Hand editieren —
 
 ```
 src/core/            pure, obsidian-frei, Vitest
-src/obsidian/         obsidian-gekoppelt: main.ts, Settings-Tab, IO-Adapter
+src/main.ts           Plugin-Einstiegspunkt (onload, Secret-Wiring, ManagerApiHandle)
+src/obsidian/         obsidian-gekoppelt: Settings-Tab, IO-Adapter
 src/i18n/strings.ts   alle Texte (UI-STANDARD §10)
 src/vendor/kit/       vendorte pure Kit-Module (verbatim, Header via sync-kit.sh)
 src/vendor/kit-obsidian/  vendorte obsidian-gekoppelte Kit-Module (verbatim)
@@ -93,7 +97,17 @@ tests/vendor/kit/     vendorter Obsidian-Mock (obsidian-mock.ts)
   `endpoint endpoint_config endpoint_diagnostics model-choice model-list-cache timeout i18n
   settings secrets` (pure) und `confirm endpoint-list model-picker settings_walker
   folder-suggest secrets` (obsidian) umgestellt.
+- 2026-09-15: restliche 11 Tasks des Plans durchlaufen — Datenmodell, `createManagerApi` (Errors
+  are values), HTTP-Probe/Reachability-Cache, Settings-Tab mit Endpunkt-Liste, i18n-Strings,
+  Schlüsselbund-Anbindung, GUI-Smoke (9/9 grün). Release 0.1.0 getaggt und auf Forgejo
+  veröffentlicht.
+- 2026-09-15 (Whole-Branch-Review): vier Important-Funde an Task-Nähten behoben — `importEndpoints`
+  wirft nie mehr (Secret-Schreibfehler wird zu `{error:"secret-missing"}`, Reihenfolge
+  Settings-erst-dann-Secrets verhindert verwaiste Schlüsselbund-Einträge), Modell-Cache im
+  Settings-Tab wird beim Protokollwechsel gezielt invalidiert (`this.modelLists.invalidate`,
+  nicht nur `handle.invalidateUrl`), README-Aussage zum `models()`-Cache korrigiert (keine TTL,
+  nur der Reachability-Cache hat 30 s). Patch-Release 0.1.1.
 
 ## Abweichungen von der Leitkonvention
 
-Keine bekannt (Stand 2026-09-15, frisches Gerüst).
+Keine bekannt (Stand 2026-09-15, Release 0.1.0/0.1.1).
