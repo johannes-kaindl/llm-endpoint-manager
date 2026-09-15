@@ -30,14 +30,4 @@ export default [
       },
     },
   },
-  {
-    // STORE-SCHULD: settings-tab/prefer-setting-definitions — src/obsidian/settings-tab.ts ist
-    // in Task 10 (2026-09-13-llm-endpoint-manager-2-manager) nur ein Stub (display() leert nur
-    // containerEl); die echte Settings-UI mit deklarativen Setting-Definitionen kommt in Task 11.
-    // Abloesung: dieser Override faellt weg, sobald Task 11 die echten Settings baut.
-    files: ["src/obsidian/settings-tab.ts"],
-    rules: {
-      "obsidianmd/settings-tab/prefer-setting-definitions": "off",
-    },
-  },
 ];
