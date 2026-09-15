@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.2] — 2026-09-15
+
 ### Changed
 - `src/core/api-types.ts` re-exports the API contract from `obsidian-kit` 0.37.0 `endpoint-source` instead of
   defining it locally — one source for `LlmEndpointManagerApi`, consumers vendor it from the Kit. No behavior
