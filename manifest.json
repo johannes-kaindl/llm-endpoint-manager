@@ -3,7 +3,7 @@
   "name": "LLM Endpoint Manager",
   "version": "0.0.0",
   "minAppVersion": "1.11.4",
-  "description": "One place for your LLM endpoints: URLs, models, capabilities and API tokens in the Obsidian keychain — shared with other plugins through a small API.",
+  "description": "One place for your LLM endpoints: URLs, models, capabilities and API tokens in the keychain — shared with other plugins through a small API.",
   "author": "Johannes Kaindl",
   "authorUrl": "https://jkaindl.de",
   "isDesktopOnly": false
