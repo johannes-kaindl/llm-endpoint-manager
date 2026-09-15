@@ -5,7 +5,7 @@ keychain — shared with other plugins through a small API.**
 
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![Docs: CC BY-SA 4.0](https://img.shields.io/badge/docs-CC%20BY--SA%204.0-lightgrey.svg)](LICENSE-DOCS)
-![Release](https://img.shields.io/badge/release-0.1.0--pending-lightgrey)
+[![Release](https://img.shields.io/badge/release-0.1.0-blue)](https://git.jkaindl.de/jkaindl/llm-endpoint-manager/releases/tag/0.1.0)
 ![Platform](https://img.shields.io/badge/platform-Obsidian%201.11.4%2B%20%C2%B7%20desktop%20%26%20mobile-7c3aed)
 
 LLM Endpoint Manager centralizes what other LLM-using plugins in this workspace otherwise
