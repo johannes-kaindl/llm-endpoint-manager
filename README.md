@@ -5,12 +5,8 @@ keychain — shared with other plugins through a small API.**
 
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![Docs: CC BY-SA 4.0](https://img.shields.io/badge/docs-CC%20BY--SA%204.0-lightgrey.svg)](LICENSE-DOCS)
-![Status](https://img.shields.io/badge/status-scaffold-lightgrey)
+![Release](https://img.shields.io/badge/release-0.1.0--pending-lightgrey)
 ![Platform](https://img.shields.io/badge/platform-Obsidian%201.11.4%2B%20%C2%B7%20desktop%20%26%20mobile-7c3aed)
-
-> **Status: scaffold.** This repository is the freshly built skeleton for the plugin — a
-> minimal, loadable plugin with a green gate (`npm run gate`) and no user-facing feature yet.
-> No release exists. The rest of this document describes the intended shape.
 
 LLM Endpoint Manager centralizes what other LLM-using plugins in this workspace otherwise
 duplicate: a list of endpoints (URL, wire format, capabilities, default model) and the API
@@ -23,7 +19,13 @@ the plugins that consume this API.
 
 ## Quick start
 
-This plugin is not yet released. To build and try the scaffold locally:
+**Via the sideloader catalog** (recommended): install
+[`anysource-sideloader`](https://git.jkaindl.de/jkaindl/anysource-sideloader), point it at the
+catalog `jkaindl/obsidian-catalog`, and install "LLM Endpoint Manager" from there.
+
+**Manually:** download `main.js`, `manifest.json` and `styles.css` from the latest release and
+copy them into `<vault>/.obsidian/plugins/llm-endpoint-manager/`, then enable the plugin in
+Obsidian's Community Plugins settings.
 
 ```bash
 npm install
@@ -33,9 +35,86 @@ npm run deploy    # requires OBSIDIAN_PLUGIN_DIR pointing at a vault's plugin fo
 
 ## Usage
 
-Not yet available — the scaffold ships a minimal `onload()` and no settings tab. Endpoint
-management, secret storage wiring and the neighbor-plugin API are built in the tasks that
-follow this one.
+Open **Settings → LLM Endpoint Manager** and add an endpoint:
+
+1. **URL** — the base URL of an OpenAI-compatible server, an Ollama instance, an
+   Automatic1111 (Stable Diffusion WebUI) or a ComfyUI instance.
+2. **Protocol** — pick the wire format the endpoint speaks: OpenAI-compatible, Ollama,
+   Automatic1111 or ComfyUI.
+3. **Capabilities** — which of `chat`, `embedding`, `vision`, `image` this endpoint can
+   serve. A consuming plugin asks for a capability, not for a specific endpoint.
+4. **Token** — optional. If your Obsidian version has a working keychain (1.11.4+), the token
+   field is available and the value goes straight into the OS keychain, never into
+   `data.json`. Without a keychain the field is locked and shows why.
+5. **Default model**, **enabled** and the endpoint's **order** (order doubles as priority —
+   the first enabled, reachable endpoint with the requested capability wins).
+
+The settings tab also shows keychain status and which plugins asked this plugin for an
+endpoint during the current session.
+
+Other plugins do not talk to your LLM servers directly. Instead they call this plugin's API to
+ask for an endpoint that can do what they need (e.g. "give me something that does `chat`"),
+get back a ready-to-use base URL, wire format and — if the caller asks for it explicitly via
+`materialize`/`resolve` — a token to send with the request. They choose which model to use
+themselves; this plugin only offers `defaultModel` as a hint.
+
+## API
+
+Other plugins reach this plugin's API at `app.plugins.plugins["llm-endpoint-manager"].api`.
+**Read the API object fresh on every call — never cache it** — the plugin can be disabled at
+any time, in which case `app.plugins.plugins["llm-endpoint-manager"]` is `undefined`.
+
+The contract (`src/core/api-types.ts`):
+
+```ts
+const LLM_ENDPOINT_MANAGER_API_VERSION = 1;
+
+type ApiErrorCode = "no-endpoint" | "not-found" | "disabled" | "secret-missing" | "unreachable";
+interface ApiError { error: ApiErrorCode }
+
+interface ApiEndpoint {
+  id: string; label: string; url: string; provider: Provider; capabilities: Capability[];
+  defaultModel?: string; enabled: boolean; hasSecret: boolean;
+}
+interface ResolvedEndpoint { id: string; label: string; config: EndpointConfig; defaultModel?: string }
+interface ImportResult { added: string[]; merged: string[]; skipped: string[] }
+
+interface LlmEndpointManagerApi {
+  version: 1;
+  list(filter?: { capability?: Capability }): ApiEndpoint[];
+  get(id: string): ApiEndpoint | null;
+  resolve(capability: Capability, opts?: { caller?: string }): Promise<ResolvedEndpoint | ApiError>;
+  materialize(id: string, opts?: { caller?: string }): Promise<ResolvedEndpoint | ApiError>;
+  models(id: string, opts?: { force?: boolean }): Promise<string[] | ApiError>;
+  importEndpoints(eps: EndpointConfig[], capability: Capability): Promise<ImportResult | ApiError>;
+  on(event: "changed", cb: () => void): () => void;
+}
+```
+
+- `Provider` is `"openai" | "ollama" | "a1111" | "comfy"`, `Capability` is
+  `"chat" | "embedding" | "vision" | "image"`.
+- **Errors are values, not exceptions.** Every method that can fail returns `ApiError` instead
+  of throwing — callers check `"error" in result` rather than wrapping every call in `try/catch`.
+- `list`/`get` return a snapshot for display; they never carry a token.
+- `resolve(capability)` finds the first enabled, reachable endpoint offering that capability
+  (in configured order) and returns it materialized — the fastest way for a caller that just
+  wants "something that can do `chat`".
+- `materialize(id)` resolves one specific endpoint the caller already knows about (e.g. one the
+  user picked explicitly).
+- `models(id)` lists the models a specific endpoint currently reports (cached ~30 s so that
+  twelve plugins asking about the same server don't send twelve requests).
+- `importEndpoints` lets a caller (e.g. a migration from an older, plugin-local endpoint list)
+  add or merge endpoint configs in bulk, including their secret values.
+- `on("changed", cb)` subscribes to endpoint list changes and returns an unsubscribe function.
+
+### Security boundary
+
+**Tokens never cross the API.** `list()` and `get()` return an `ApiEndpoint` with a boolean
+`hasSecret` flag only — the token value itself is not part of that shape
+(`toApiEndpoint` in `src/core/api.ts` builds the object field by field and never touches
+`secretId`/`apiKey`). Only `resolve()` and `materialize()` hand back a `ResolvedEndpoint` whose
+`config` carries the token — and only to a caller that explicitly asked to send a request to
+that endpoint, at the moment it needs it, never as part of a listing.
 
 ## License
 

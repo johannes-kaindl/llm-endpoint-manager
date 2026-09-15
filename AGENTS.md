@@ -71,6 +71,20 @@ tests/vendor/kit/     vendorter Obsidian-Mock (obsidian-mock.ts)
   (`git -C <repo> tag -l`), bevor der Sync läuft.
 - `eslint.config.mjs` selbst klammert `src/vendor/**` NICHT aus (Kern ist template-verwaltet,
   byte-gleich mit `tools/release-template/`) — die Ausnahme lebt in `eslint.overrides.mjs`.
+- **Secret-ID ist nicht die rohe Endpunkt-ID.** `secretIdOf(id)` (`src/core/model.ts`) geht über
+  `secretIdFor(SECRET_PREFIX, id)` (`src/vendor/kit/secrets.ts`): lowercased, `[^a-z0-9-]` wird
+  zu `-` normalisiert, doppelte/führende/trailing `-` entfernt. Ein Vergleich gegen die rohe
+  Endpunkt-`id` (z. B. eine UUID mit Großbuchstaben — `crypto.randomUUID()` liefert nur
+  Kleinbuchstaben, ein importierter Alt-Wert aber womöglich nicht) findet den Schlüsselbund-Eintrag
+  sonst nicht.
+- **`apiKey` darf nie in `data.json` landen — der einzige Weg dorthin ist `toPersisted`.** Es
+  entfernt `apiKey` aus jedem Eintrag, bevor `ManagerSettings` gespeichert wird. Wer Settings über
+  einen anderen Pfad schreibt (z. B. testweise `plugin.saveData(rawSettings)` statt
+  `toPersisted(rawSettings)`), schreibt das Token im Klartext.
+- **`hide()` im Settings-Tab muss den Modell-Cache räumen**, sonst bleibt ein Endpunkt, der
+  einmal als „nicht erreichbar" gemessen wurde, für den Rest der Sitzung so stehen — auch nachdem
+  die URL korrigiert wurde. Umgesetzt in `src/obsidian/settings-tab.ts` `hide()`
+  (`this.modelLists.clear()`), Kit-Vertrag aus `obsidian/endpoint-list`.
 
 ## Memory
 
