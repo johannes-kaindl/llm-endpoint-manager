@@ -148,7 +148,11 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
       for (const p of PROVIDERS) d.addOption(p, t(`row.provider.${p}`));
       d.setValue(cfg.provider);
       d.selectEl.setAttribute("aria-label", t("row.provider"));
-      d.onChange((v) => { void save((e) => { e.provider = v as Provider; }).then(() => this.refreshUi()); });
+      // Protokollwechsel ändert den Probe-Pfad, nicht die (normalisierte) URL — der Modell-Cache
+      // ist nach Schlüssel indiziert, muss also hier gezielt invalidiert werden. `save()` invalidiert
+      // nur `handle.invalidateUrl` (API-interne Caches, s. Kommentar dort); dieser Cache ist lokal
+      // im Settings-Tab und lebt in `this.modelLists`, nicht im Handle.
+      d.onChange((v) => { this.modelLists.invalidate(normalizeEndpoint(cfg.url)); void save((e) => { e.provider = v as Provider; }).then(() => this.refreshUi()); });
     });
     const caps = new Setting(host).setName(t("row.capabilities"));
     for (const c of CAPABILITIES) {

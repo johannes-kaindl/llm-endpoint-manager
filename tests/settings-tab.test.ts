@@ -51,6 +51,22 @@ describe("LlmEndpointManagerSettingTab", () => {
     await new Promise(r => setTimeout(r, 0));
     expect(plugin.settings.endpoints[0]?.capabilities).toEqual(["chat", "embedding"]);
   });
+  it("invalidiert den Modell-Cache-Schlüssel des Endpunkts bei Protokollwechsel", async () => {
+    // Der Protokollwechsel ändert den Probe-Pfad, nicht die normalisierte URL — der Cache-Schlüssel
+    // bleibt also gleich, und nur eine gezielte invalidate(key) räumt den stehenden Eintrag. Ein
+    // Nachladen über die echte Endpunkt-Liste ist hier nicht beobachtbar (die UI lädt beim Rerender
+    // selbst nach und würde den Cache erneut befüllen, bevor der Test hinsieht) — der Spy prüft
+    // deshalb direkt den Aufruf statt den Seiteneffekt danach.
+    const { el, tab: t } = await tab({ endpoints: [{ id: "e1", url: "http://a", provider: "openai", capabilities: ["chat"] }] });
+    const cache = (t as unknown as { modelLists: import("../src/vendor/kit/model-list-cache").ModelListCache }).modelLists;
+    const calls: string[] = [];
+    const origInvalidate = cache.invalidate.bind(cache);
+    cache.invalidate = (key: string) => { calls.push(key); origInvalidate(key); };
+    const inExtra = settingsIn(el.querySelectorAll(".okit-ep-extra")[0]!);
+    const dropdowns = inExtra.flatMap(s => s.components.filter((c: unknown): c is DropdownComponent => c instanceof DropdownComponent));
+    dropdowns[0]!.onChangeCB?.("a1111");
+    expect(calls).toEqual(["http://a"]);   // normalizeEndpoint("http://a")
+  });
   it("zeigt ohne Schlüsselbund den Hinweis und keinen Konsumenten-Eintrag", async () => {
     const app = makeFakeApp(); delete app.secretStorage;
     const { el } = await tab({}, app);
