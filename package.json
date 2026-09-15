@@ -1,6 +1,6 @@
 {
   "name": "llm-endpoint-manager",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "One place for your LLM endpoints: URLs, models, capabilities and API tokens in the keychain — shared with other plugins through a small API.",
   "type": "module",
   "scripts": {

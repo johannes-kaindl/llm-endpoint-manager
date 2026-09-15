@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.1] — 2026-09-15
+
 ### Fixed
 - `importEndpoints` no longer throws when the keychain fails to persist a secret — it returns `{error: "secret-missing"}` instead, matching the "errors are values" contract. Settings are now persisted before secrets are written, so a partial failure never leaves an orphaned keychain entry.
 - The settings tab's model-list cache is now invalidated when an endpoint's protocol changes, so the model dropdown no longer shows stale results from the previous protocol.
