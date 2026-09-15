@@ -1,0 +1,33 @@
+{
+  "name": "llm-endpoint-manager",
+  "version": "0.0.0",
+  "description": "One place for your LLM endpoints: URLs, models, capabilities and API tokens in the Obsidian keychain — shared with other plugins through a small API.",
+  "type": "module",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "tsc --noEmit && node esbuild.config.mjs --production",
+    "typecheck": "tsc --noEmit",
+    "typecheck:test": "tsc -p tsconfig.test.json --noEmit",
+    "test": "node scripts/check-no-nul-bytes.mjs && vitest run",
+    "lint": "node scripts/check-no-inline-disables.mjs && eslint src --max-warnings 0",
+    "check:pure": "node scripts/check-pure.mjs",
+    "gate": "npm run lint && npm run typecheck && npm run typecheck:test && npm test && npm run check:pure && npm run build",
+    "deploy": "npm run build && cp main.js manifest.json styles.css \"${OBSIDIAN_PLUGIN_DIR:?set OBSIDIAN_PLUGIN_DIR}\"/",
+    "release": "test -f ../tools/release/release.mjs || { echo \"FEHLER: ../tools/release/ fehlt. Dieses Repo muss im Dach-Verzeichnis obsidian-plugins/ neben tools/ liegen.\" >&2; exit 1; }; node ../tools/release/release.mjs --no-github",
+    "version-bump": "test -f ../tools/release/version-bump.mjs || { echo \"FEHLER: ../tools/release/ fehlt.\" >&2; exit 1; }; node ../tools/release/version-bump.mjs",
+    "preflight": "test -f ../tools/release/preflight.mjs || { echo \"FEHLER: ../tools/release/ fehlt.\" >&2; exit 1; }; node ../tools/release/preflight.mjs --no-github"
+  },
+  "keywords": ["obsidian-plugin", "llm", "endpoints", "keychain", "local-first"],
+  "author": "Johannes Kaindl",
+  "license": "AGPL-3.0-or-later",
+  "devDependencies": {
+    "@types/node": "^20",
+    "esbuild": "^0.23",
+    "eslint": "^9",
+    "eslint-plugin-obsidianmd": "^0.4.1",
+    "obsidian": "latest",
+    "typescript": "^5.5",
+    "typescript-eslint": "^8",
+    "vitest": "^2"
+  }
+}
