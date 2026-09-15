@@ -1,0 +1,14 @@
+import { describe, it, expect } from "vitest";
+import { STRINGS } from "../src/i18n/strings";
+
+describe("STRINGS", () => {
+  it("de hat genau die Schlüssel von en, keiner leer", () => {
+    const en = Object.keys(STRINGS.en).sort(); const de = Object.keys(STRINGS.de).sort();
+    expect(de).toEqual(en);
+    for (const k of en) { expect(STRINGS.en[k]).toBeTruthy(); expect(STRINGS.de[k]).toBeTruthy(); }
+  });
+  it("kein Fachbegriff ohne Auflösung: 'Endpoint' wird beim ersten Vorkommen erklärt", () => {
+    expect(STRINGS.en["set.endpointsDesc"]).toMatch(/server address/i);
+    expect(STRINGS.de["set.endpointsDesc"]).toMatch(/Serveradresse/);
+  });
+});
