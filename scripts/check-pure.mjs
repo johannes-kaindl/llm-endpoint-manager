@@ -1,13 +1,17 @@
 // src/core darf `obsidian` nicht importieren (PROF-OBS-03/04).
 // Bewusst ein Script und kein grep-Einzeiler: grep in package.json erfasst nur eine
 // Anfuehrungszeichen-Variante und laesst die andere still durch.
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 const ROOT = "src/core";
 const FORBIDDEN = /(?:from|import)\s*\(?\s*["']obsidian(\/[^"']*)?["']/;
 
+// Git trackt keine leeren Verzeichnisse — ein frischer Klon eines Repos, dessen src/core
+// noch nichts enthaelt (z.B. dieses Geruest vor Task 10), hat den Ordner schlicht nicht.
+// Ohne Guard crasht readdirSync mit ENOENT statt "nichts zu pruefen" zu melden.
 function walk(dir) {
+  if (!existsSync(dir)) return [];
   return readdirSync(dir).flatMap((entry) => {
     const full = join(dir, entry);
     return statSync(full).isDirectory() ? walk(full) : [full];
