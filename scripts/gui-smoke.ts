@@ -104,7 +104,7 @@ async function settingsStelle(cdp: Cdp, port: number): Promise<SettingsStelle | 
   return {
     cdp: fenster,
     eigenesFenster: true,
-    el: (ausdruck) => `(() => { const root = document; return (${ausdruck}) ?? null; })()`,
+    el: (ausdruck) => `(() => { const root = document.body; return (${ausdruck}) ?? null; })()`,
   };
 }
 
