@@ -191,6 +191,31 @@ async function main(): Promise<void> {
   let fake: { url: string; close: () => Promise<void> } | null = null;
   let settings: SettingsStelle | null = null;
   const warnungen: string[] = [];
+  // Zwei Zustandssorten ueberleben einen Ctrl-C mitten im Lauf, das `finally` unten nie: der
+  // Fake-Endpunkt in `settings.endpoints` (data.json des Vaults) und ein per A3 geschriebenes
+  // Klartext-Token im echten macOS-Schluesselbund (`app.secretStorage`, keyed auf
+  // `${PLUGIN_ID}-${epId}`) — die zufaellige `epId` macht diesen Eintrag ohne den Handler
+  // dauerhaft verwaist: kein kuenftiger Lauf generiert je wieder dieselbe UUID, um ihn zu finden.
+  let activeSecretId: string | null = null;
+  let signalCleanupRunning = false;
+  const onAbortSignal = (signal: NodeJS.Signals) => {
+    if (signalCleanupRunning) return;
+    signalCleanupRunning = true;
+    void (async () => {
+      console.log(`\n\nAbbruch durch ${signal} — raeume Testdaten auf...`);
+      await cdp.evaluate(`
+        const p = app.plugins.plugins[${q(PLUGIN_ID)}];
+        if (p) { p.settings.endpoints = []; await p.saveSettings(); }
+        ${activeSecretId ? `app.secretStorage.setSecret(${q(activeSecretId)}, "");` : ""}
+        return true;
+      `).catch(() => { console.log("  ! Aufraeumen im Renderer fehlgeschlagen — data.json/Schluesselbund von Hand pruefen"); });
+      if (fake) await fake.close().catch(() => undefined);
+      cdp.close();
+      process.exit(130);
+    })();
+  };
+  process.on("SIGINT", onAbortSignal);
+  process.on("SIGTERM", onAbortSignal);
 
   try {
     if (process.platform === "darwin") {
@@ -248,7 +273,17 @@ async function main(): Promise<void> {
     record("C1 Restricted-Mode-Guard (Plugin nach setEnable geladen)", geladen, geladen ? `Vault ${vaultInfo.name}${frei ? ` (${frei})` : " (bereits aktiv)"}` : `app.plugins.plugins.${PLUGIN_ID} fehlt — ${frei || "kein Freischaltversuch"}`);
     if (!geladen) throw new Error("Ohne geladenes Plugin ist jeder weitere Punkt gegenstandslos.");
 
-    // Frischer Ausgangszustand: alle evtl. vom letzten Lauf verbliebenen Endpunkte weg.
+    // Frischer Ausgangszustand: alle evtl. vom letzten Lauf verbliebenen Endpunkte weg. Ein
+    // nicht-leeres Array an dieser Stelle ist der einzige nach aussen sichtbare Rest eines per
+    // Ctrl-C abgebrochenen Vorlaufs (der Schluesselbund-Eintrag aus A3 ist UUID-keyed und ohne
+    // Listing-API von hier aus nicht auffindbar — der Handler unten verhindert seine Entstehung
+    // direkt, statt sie hinterher zu erkennen).
+    const vorher = await cdp.evaluate<number>(`return app.plugins.plugins[${q(PLUGIN_ID)}].settings.endpoints.length;`);
+    record(
+      "C2 Keine liegen gebliebenen Test-Endpunkte aus einem abgebrochenen Vorlauf",
+      vorher === 0,
+      vorher === 0 ? "Liste war leer" : `${vorher} Endpunkt(e) gefunden und weggeraeumt`,
+    );
     await cdp.evaluate(`
       const p = app.plugins.plugins[${q(PLUGIN_ID)}];
       p.settings.endpoints = [];
@@ -279,6 +314,7 @@ async function main(): Promise<void> {
     );
     if (!ep0) throw new Error("A2 fehlgeschlagen — ohne Endpunkt sind A3-A5 gegenstandslos.");
     const epId = ep0.id;
+    activeSecretId = `${PLUGIN_ID}-${epId}`; // ab hier kann A3 jederzeit den Schluesselbund schreiben
 
     // A3 — Token setzen.
     const secretTyped = await settings.cdp.evaluate<{ ok: boolean }>(`
@@ -367,6 +403,7 @@ async function main(): Promise<void> {
       removeOk.ok && removed !== null && (secretValAfterRemove.v === null || secretValAfterRemove.v === ""),
       `remove=${removeOk.ok}, secret=${q(secretValAfterRemove.v)}, endpoints=${(await cdp.evaluate<number>(`return app.plugins.plugins[${q(PLUGIN_ID)}].settings.endpoints.length;`))}`,
     );
+    activeSecretId = null; // A5 hat das Token bereits mitentfernt — ab hier nichts mehr im Schluesselbund
 
     // --- B1-B3: API gegen den Fake-Endpunkt --------------------------------------------
     console.log("\nB · API gegen den Fake-Endpunkt");
@@ -444,9 +481,23 @@ async function main(): Promise<void> {
     );
     fake = null;
   } finally {
+    // B haengt seinen Fake-Endpunkt am Ende NICHT selbst aus — ohne diese Zeile hinterlaesst
+    // schon ein regulaer DURCHGELAUFENER Lauf einen Rest in settings.endpoints, den C2 des
+    // naechsten Laufs faelschlich als „aus einem Ctrl-C" liest (gemessen beim Einbau dieses
+    // Punkts: der Vorlauf-Lauf ohne diese Zeile faerbte C2 rot, obwohl nichts abgebrochen war).
+    await cdp.evaluate(`
+      const p = app.plugins.plugins[${q(PLUGIN_ID)}];
+      if (p) { p.settings.endpoints = []; await p.saveSettings(); }
+      return true;
+    `).catch(() => undefined);
     if (settings) closeSettings(cdp, settings);
     if (fake) await fake.close().catch(() => undefined);
     cdp.close();
+    // Abmelden, sonst haengt ein SPAETES Signal (nach normalem Abschluss, cdp schon zu) den
+    // Prozess in `onAbortSignal`s cdp.evaluate auf einer toten Verbindung auf (gemessen: ein
+    // SIGINT, das den Lauf knapp verpasst, liess den Node-Prozess nie beenden).
+    process.off("SIGINT", onAbortSignal);
+    process.off("SIGTERM", onAbortSignal);
   }
 
   const failed = checks.filter((c) => c.zustand === "rot");
