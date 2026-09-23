@@ -80,6 +80,29 @@ async function startFakeEndpoint(): Promise<{ url: string; close: () => Promise<
   };
 }
 
+/** Eigener Mini-Server statt eines evtl. laufenden echten LM Studio — D3 prueft nur den
+ *  Erkennungspfad (`/api/config` → 404, `/api/v1/models` → Treffer), reiner Lesevorgang, kein
+ *  Modell-Load (Auftragsregel 12: „Im Smoke nur gegen die Endpunkte, die der Treiber ohnehin
+ *  anlegt"). `model` muss in der zurueckgegebenen Liste stehen — `probeEndpoint`/`parseLmStudioV1`
+ *  matcht per `id`, ein Treffer ohne passende ID gilt als „nicht gefunden" (siehe capabilities.ts). */
+async function startFakeLmStudio(): Promise<{ url: string; close: () => Promise<void> }> {
+  const server: Server = createServer((req, res) => {
+    if (req.url?.includes("/api/v1/models") === true) {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ data: [{ id: "smoke-model", capabilities: {} }] }));
+      return;
+    }
+    res.writeHead(404, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "not found" }));
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const port = (server.address() as AddressInfo).port;
+  return {
+    url: `http://127.0.0.1:${port}`,
+    close: () => new Promise<void>((resolve) => { server.close(() => { resolve(); }); }),
+  };
+}
+
 // --- Settings-Stelle: Modal (< 1.13) oder eigenes Fenster (>= 1.13) --------------------
 /** Uebernommen aus anysource-sideloader/scripts/gui-smoke.ts (Modal-vs-eigenes-Fenster-
  *  Unterscheidung), 2026-09-15 — Obsidian 1.13 macht aus den Einstellungen ein eigenes
@@ -189,6 +212,7 @@ async function main(): Promise<void> {
   }
 
   let fake: { url: string; close: () => Promise<void> } | null = null;
+  let fakeLm: { url: string; close: () => Promise<void> } | null = null;
   let settings: SettingsStelle | null = null;
   const warnungen: string[] = [];
   // Zwei Zustandssorten ueberleben einen Ctrl-C mitten im Lauf, das `finally` unten nie: der
@@ -210,6 +234,7 @@ async function main(): Promise<void> {
         return true;
       `).catch(() => { console.log("  ! Aufraeumen im Renderer fehlgeschlagen — data.json/Schluesselbund von Hand pruefen"); });
       if (fake) await fake.close().catch(() => undefined);
+      if (fakeLm) await fakeLm.close().catch(() => undefined);
       cdp.close();
       process.exit(130);
     })();
@@ -480,6 +505,87 @@ async function main(): Promise<void> {
       `stop→${JSON.stringify(resolveDown1)} · restart-in-TTL→${JSON.stringify(resolveDown2)} · models(force)→${JSON.stringify(modelsRes)}`,
     );
     fake = null;
+
+    // --- D1-D3: Modelltabelle und Backend -----------------------------------------------
+    console.log("\nD · Modelltabelle und Backend");
+
+    // D1 — Modellblock sichtbar: Metadaten direkt ueber die API setzen (kein Netzwerk noetig),
+    // Settings neu oeffnen, Zeile fuer die Modell-ID erscheint.
+    await cdp.evaluate(`
+      const p = app.plugins.plugins[${q(PLUGIN_ID)}];
+      const e = p.settings.endpoints.find((x) => x.id === ${q(fakeId)});
+      e.models = [{ id: "verdigado-pro" }];
+      await p.saveSettings();
+      return true;
+    `);
+    settings = await reopenSettings(cdp, port, settings);
+    const modelRowVisible = await settings.cdp.evaluate<{ ok: boolean }>(`
+      const names = Array.from(${settings.el(`root.querySelectorAll(".setting-item-name")`)}).map((n) => n.textContent);
+      return { ok: names.includes("verdigado-pro") };
+    `);
+    record("D1 Modellblock sichtbar — Zeile für verdigado-pro", modelRowVisible.ok, `Zeile vorhanden=${modelRowVisible.ok}`);
+
+    // D2 — Familie fuer den Alias per Dropdown setzen, Settings neu laden, Wert bleibt.
+    const familySetOk = await settings.cdp.evaluate<{ ok: boolean }>(`
+      const row = Array.from(${settings.el(`root.querySelectorAll(".setting-item")`)}).find((r) => {
+        const n = r.querySelector(".setting-item-name");
+        return n && n.textContent === "verdigado-pro";
+      });
+      const dd = row ? row.querySelector("select") : null;
+      if (!dd) return { ok: false };
+      dd.value = "gpt-oss";
+      dd.dispatchEvent(new Event("change", { bubbles: true }));
+      return { ok: true };
+    `);
+    const familyPersisted = await pollUntil<{ ok: boolean }>(cdp, `
+      const e = app.plugins.plugins[${q(PLUGIN_ID)}].settings.endpoints.find((x) => x.id === ${q(fakeId)});
+      const m = e && e.models ? e.models.find((mm) => mm.id === "verdigado-pro") : null;
+      return m && m.family === "gpt-oss" ? { ok: true } : null;
+    `, 8000, 300);
+    settings = await reopenSettings(cdp, port, settings);
+    const familyAfterReload = await settings.cdp.evaluate<{ v: string | null }>(`
+      const row = Array.from(${settings.el(`root.querySelectorAll(".setting-item")`)}).find((r) => {
+        const n = r.querySelector(".setting-item-name");
+        return n && n.textContent === "verdigado-pro";
+      });
+      const dd = row ? row.querySelector("select") : null;
+      return { v: dd ? dd.value : null };
+    `);
+    record(
+      "D2 Familie für ein Alias setzen → nach Neuladen der Settings wieder da",
+      familySetOk.ok && familyPersisted !== null && familyAfterReload.v === "gpt-oss",
+      `set=${familySetOk.ok}, persistiert=${familyPersisted !== null}, nach Reload=${q(familyAfterReload.v)}`,
+    );
+
+    // D3 — „Erkennen“ gegen einen treibereigenen Fake-LM-Studio (Auftragsregel 12: kein
+    // JIT-Load, nur Lesevorgaenge). `model` muss zur zurueckgegebenen Modell-ID passen, sonst
+    // gilt der LM-Studio-v1-Treffer laut capabilities.ts als „nicht gefunden".
+    fakeLm = await startFakeLmStudio();
+    console.log(`  Fake-LM-Studio: ${fakeLm.url} (nur /api/v1/models beantwortet, sonst 404)`);
+    const lmId = await cdp.evaluate<string>(`
+      const p = app.plugins.plugins[${q(PLUGIN_ID)}];
+      const id = crypto.randomUUID();
+      p.settings.endpoints.push({ id, label: "gui-smoke lmstudio", url: ${q(fakeLm.url)}, provider: "openai", capabilities: ["chat"], enabled: true, model: "smoke-model" });
+      await p.saveSettings();
+      return id;
+    `);
+    settings = await reopenSettings(cdp, port, settings);
+    // Zwei „Erkennen"-Knoepfe stehen jetzt im DOM (je Endpunkt einer) — der zuletzt eingefuegte
+    // Endpunkt (gui-smoke lmstudio) rendert seinen Block als letzten, `.pop()` trifft ihn gezielt.
+    const detectOk = await clickReal(settings.cdp, settings.el(
+      `Array.from(root.querySelectorAll("button")).filter((b) => b.textContent.trim() === "Detect" || b.textContent.trim() === "Erkennen").pop()`,
+    ));
+    const backendDetected = await pollUntil<{ ok: boolean }>(cdp, `
+      const e = app.plugins.plugins[${q(PLUGIN_ID)}].settings.endpoints.find((x) => x.id === ${q(lmId)});
+      return e && e.backend === "lmstudio" ? { ok: true } : null;
+    `, 8000, 300);
+    await fakeLm.close();
+    fakeLm = null;
+    record(
+      "D3 „Erkennen“ gegen Fake-LM-Studio liefert lmstudio (nur Lesen, kein Modell-Load)",
+      detectOk && backendDetected !== null,
+      `Klick=${detectOk}, backend=${backendDetected !== null ? "lmstudio" : "nicht gesetzt"}`,
+    );
   } finally {
     // B haengt seinen Fake-Endpunkt am Ende NICHT selbst aus — ohne diese Zeile hinterlaesst
     // schon ein regulaer DURCHGELAUFENER Lauf einen Rest in settings.endpoints, den C2 des
@@ -492,6 +598,7 @@ async function main(): Promise<void> {
     `).catch(() => undefined);
     if (settings) closeSettings(cdp, settings);
     if (fake) await fake.close().catch(() => undefined);
+    if (fakeLm) await fakeLm.close().catch(() => undefined);
     cdp.close();
     // Abmelden, sonst haengt ein SPAETES Signal (nach normalem Abschluss, cdp schon zu) den
     // Prozess in `onAbortSignal`s cdp.evaluate auf einer toten Verbindung auf (gemessen: ein

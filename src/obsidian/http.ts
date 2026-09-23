@@ -4,6 +4,7 @@ import { classifyEndpointStatus, type EndpointStatus } from "../vendor/kit/endpo
 import { normalizeEndpoint } from "../vendor/kit/endpoint";
 import { authHeaders, type EndpointConfig } from "../vendor/kit/endpoint_config";
 import { withTimeout } from "../vendor/kit/timeout";
+import type { CapabilityFetch } from "../vendor/kit/capabilities";
 import { providerProbe } from "../core/provider";
 import type { Provider } from "../core/model";
 
@@ -18,13 +19,13 @@ function toWireError(err: unknown): Wire {
   return { status: 0, text: "", timedOut: false, error: err instanceof Error ? err.message : String(err) };
 }
 
-async function send(url: string, timeoutMs: number, headers?: Record<string, string>): Promise<Wire> {
+async function send(url: string, timeoutMs: number, headers?: Record<string, string>, method = "GET", body?: string): Promise<Wire> {
   // requestUrl(...) selbst kann synchron werfen (nicht nur seine Promise ablehnen) — z. B. bei
   // einer ungueltigen URL. Ohne dieses try/catch verliesse ein solcher Wurf send() ungefangen
   // und verletzte den Vertrag "Fehler sind Werte, keine Wuerfe" der Aufrufer (probeStatus/listModels).
   let work: Promise<Wire>;
   try {
-    work = requestUrl({ url, method: "GET", headers, throw: false })
+    work = requestUrl({ url, method, headers, body, throw: false })
       .then((res) => ({ status: res.status, text: res.text, timedOut: false, error: null }))
       .catch((err: unknown) => toWireError(err));
   } catch (err) {
@@ -33,6 +34,14 @@ async function send(url: string, timeoutMs: number, headers?: Record<string, str
   const raced = await withTimeout(work, timeoutMs, window);
   return raced.timedOut ? { status: 0, text: "", timedOut: true, error: null } : raced.value;
 }
+
+/** Transport für die Backend-/Capability-Probe (`probeEndpoint`, `fetchCapabilities` aus dem
+ *  Kit): Status ≠ 2xx oder nicht parsebares JSON → `null`, nie ein Wurf (CapabilityFetch-Vertrag). */
+export const capabilityFetch: CapabilityFetch = async (req) => {
+  const res = await send(req.url, PROBE_TIMEOUT_MS, req.headers, req.method ?? "GET", req.body);
+  if (res.timedOut || res.error !== null || res.status < 200 || res.status >= 300) return null;
+  try { return { json: JSON.parse(res.text) }; } catch { return null; }
+};
 
 function target(cfg: EndpointConfig, provider: Provider): string {
   return `${normalizeEndpoint(cfg.url)}${providerProbe(provider).path}`;

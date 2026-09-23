@@ -49,6 +49,14 @@ Open **Settings → LLM Endpoint Manager** and add an endpoint:
 5. **Default model**, **enabled** and the endpoint's **order** (order doubles as priority —
    the first enabled, reachable endpoint with the requested capability wins).
 
+A separate **Models** section lists, per endpoint, every model the endpoint reports plus any
+you have already configured. For each model you can set its **family** (a guess from the model
+name is offered as a suggestion, e.g. `verdigado-pro → gpt-oss`) and mark it as **another
+spelling of** another model id — consumers then send that other id instead. Each endpoint also
+gets a **Backend** field (LM Studio, Ollama, Open WebUI, OpenAI-compatible); "Detect" probes the
+endpoint read-only (`/api/config`, `/api/show`, `/api/v1/models`, `/api/v0/models` — it never
+loads a model) and fills the field in.
+
 The settings tab also shows keychain status and which plugins asked this plugin for an
 endpoint during the current session.
 

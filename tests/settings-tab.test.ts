@@ -73,4 +73,14 @@ describe("LlmEndpointManagerSettingTab", () => {
     expect(el.textContent).toContain("1.11.4");
     expect(el.textContent).toContain("No plugin has asked");   // pickLang(null) faellt auf en, da der Mock keine getLanguage liefert
   });
+  it("shows stored model rows with family dropdown and a backend row per endpoint", async () => {
+    const { el } = await tab({ endpoints: [{ id: "o", label: "LGS", url: "https://h/api", capabilities: ["chat"], backend: "openwebui", models: [{ id: "verdigado-pro", family: "gpt-oss" }] }] });
+    const settings = el.querySelectorAll(".setting-item").map((n) => n.__setting!).filter(Boolean);
+    const row = settings.find((s) => s.nameValue === "verdigado-pro")!;
+    const dd = row.components.find((c): c is DropdownComponent => c instanceof DropdownComponent)!;
+    expect(dd.getValue()).toBe("gpt-oss");
+    expect(Object.keys(dd.options)).toEqual(["", "qwen3.8", "qwen3.6", "gemma4", "gpt-oss"]);
+    const backend = settings.find((s) => s.components.some((c) => c instanceof DropdownComponent && (c as DropdownComponent).getValue() === "openwebui"));
+    expect(backend).toBeDefined();
+  });
 });

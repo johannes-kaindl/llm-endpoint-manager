@@ -6,6 +6,19 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Each endpoint can now carry a model table (family, alias) and a backend (LM Studio, Ollama, Open WebUI,
+  OpenAI-compatible). Family is suggested from the model name (`familyFromName`) and can be overridden per
+  model; an alias marks another spelling of the same model. Backend can be auto-detected ("Detect" button,
+  read-only probe against `/api/config`, `/api/show`, `/api/v1/models`, `/api/v0/models` — never loads a
+  model). New "Models" section in the settings tab, one block per endpoint.
+- Plugin API v1 (`version` stays `1`): `get`/`resolve`/`materialize` now carry `backend`/`models` when set on
+  the endpoint — both fields are optional and additive, existing consumers see no change.
+
+### Changed
+- Vendoring bumped to `obsidian-kit` 0.41.0 / `code-kit` 0.7.0 (new modules `sampling-profiles`,
+  `capabilities`, `reasoning`).
+
 ## [0.1.2] — 2026-09-15
 
 ### Changed

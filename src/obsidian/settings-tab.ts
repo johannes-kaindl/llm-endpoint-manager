@@ -7,9 +7,12 @@ import { createModelListCache, type ModelListCache } from "../vendor/kit/model-l
 import type { EndpointStatusKind } from "../vendor/kit/endpoint_diagnostics";
 import type { EndpointRole } from "../vendor/kit/endpoint_config";
 import { normalizeEndpoint } from "../vendor/kit/endpoint";
+import { BACKEND_IDS, BACKENDS, FAMILIES, FAMILY_IDS, type BackendId, type FamilyId } from "../vendor/kit/sampling-profiles";
+import { probeBaseUrl, probeEndpoint } from "../vendor/kit/capabilities";
 import { CAPABILITIES, PROVIDERS, labelFromUrl, newId, type ManagedEndpoint, type Provider } from "../core/model";
+import { modelRows, setModelMeta, type ModelRow } from "../core/model-rows";
 import { PRESETS } from "../core/provider";
-import { clientFor } from "./http";
+import { clientFor, capabilityFetch } from "./http";
 
 type ItemDef = { name?: string; desc?: string; render?: (setting: Setting) => void };
 type GroupDef = { type?: string; heading?: string; items?: ItemDef[] };
@@ -34,6 +37,9 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
     const defs: GroupDef[] = [
       { type: "group", heading: t("set.groupEndpoints"), items: [
         { name: t("set.endpoints"), desc: t("set.endpointsDesc"), render: (s) => { this.renderEndpoints(s); } },
+      ] },
+      { type: "group", heading: t("models.heading"), items: [
+        { name: t("models.heading"), render: (s) => { this.renderModelsAndBackend(s); } },
       ] },
       { type: "group", heading: t("set.groupKeychain"), items: [
         { name: t("set.groupKeychain"), render: (s) => { this.renderKeychainStatus(s); } },
@@ -184,6 +190,83 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
     const warn = Array.from(host.querySelectorAll<HTMLElement>(".lem-row-warn")).find((w) => w.getAttribute("data-for") === id);
     if (!warn) return;
     warn.setText(e && e.capabilities.length === 0 ? t("row.noCapability") : "");
+  }
+
+  /** Modelltabelle (Familie, Alias) und Backend je Endpunkt — bewusst NICHT in `renderExtra`
+   *  (dort zählt der Kit-Editor die Fähigkeiten-/Protokoll-Zeilen; eine zusätzliche Dropdown
+   *  dort verschöbe deren Form). Eigene Gruppe, ein Block je Endpunkt. */
+  private renderModelsAndBackend(setting: Setting): void {
+    const host = settingBodyHost(setting);
+    for (const ep of this.plugin.settings.endpoints) {
+      new Setting(host).setName(ep.label).setHeading();
+      this.renderModels(host, ep);
+      this.renderBackend(host, ep);
+    }
+  }
+
+  private renderModels(host: HTMLElement, cfg: ManagedEndpoint): void {
+    const listHost = host.createDiv({ cls: "lem-models-list" });
+    const draw = (listed: string[]): void => {
+      listHost.empty();
+      const current = this.plugin.settings.endpoints.find((e) => e.id === cfg.id) ?? cfg;
+      for (const row of modelRows(listed, current.models)) this.renderModelRow(listHost, current, row);
+    };
+    draw([]);
+    void this.plugin.api.models(cfg.id).then((r) => { if (Array.isArray(r)) draw(r); });
+  }
+
+  private renderModelRow(host: HTMLElement, cfg: ManagedEndpoint, row: ModelRow): void {
+    const save = async (patch: { family?: FamilyId | null; aliasOf?: string | null }): Promise<void> => {
+      const target = this.plugin.settings.endpoints.find((e) => e.id === cfg.id);
+      if (!target) return;
+      const updated = setModelMeta(target, row.id, patch);
+      if (updated.models) target.models = updated.models; else delete target.models;
+      await this.plugin.saveSettings();
+    };
+    const setting = new Setting(host).setName(row.id);
+    setting.addDropdown((d) => {
+      d.addOption("", row.suggested ? t("models.familySuggested", FAMILIES[row.suggested].label) : t("models.familyAuto"));
+      for (const f of FAMILY_IDS) d.addOption(f, FAMILIES[f].label);
+      d.selectEl.setAttribute("aria-label", t("models.family"));
+      d.setValue(row.family ?? "");
+      d.onChange((v) => { void save({ family: v ? (v as FamilyId) : null }); });
+    });
+    setting.addText((tx) => {
+      tx.setValue(row.aliasOf ?? "");
+      tx.setPlaceholder(t("models.aliasOf"));
+      tx.inputEl.setAttribute("aria-label", t("models.aliasOfDesc"));
+      tx.inputEl.addEventListener("blur", () => { void save({ aliasOf: tx.getValue().trim() || null }); });
+    });
+  }
+
+  private renderBackend(host: HTMLElement, cfg: ManagedEndpoint): void {
+    new Setting(host).setName(t("backend.name")).addDropdown((d) => {
+      d.addOption("", t("models.familyAuto"));
+      for (const b of BACKEND_IDS) d.addOption(b, BACKENDS[b].label);
+      d.selectEl.setAttribute("aria-label", t("backend.name"));
+      d.setValue(cfg.backend ?? "");
+      d.onChange((v) => { void this.saveBackend(cfg.id, v ? (v as BackendId) : null); });
+    }).addButton((btn) => {
+      btn.setButtonText(t("backend.detect"));
+      btn.onClick(() => { void this.detectBackend(cfg); });
+    });
+  }
+
+  private async saveBackend(id: string, backend: BackendId | null): Promise<void> {
+    const target = this.plugin.settings.endpoints.find((e) => e.id === id);
+    if (!target) return;
+    if (backend) target.backend = backend; else delete target.backend;
+    await this.plugin.saveSettings();
+  }
+
+  /** `capabilityFetch` fragt nur `/api/config`, `/api/show`, `/api/v1/models`, `/api/v0/models`
+   *  — reine GET/HEAD-artige Lesevorgänge, kein JIT-Load eines Modells (Auftragsregel 12). */
+  private async detectBackend(cfg: ManagedEndpoint): Promise<void> {
+    const r = await probeEndpoint(capabilityFetch, probeBaseUrl(cfg.url), cfg.model ?? "");
+    if (r.backend === "unknown") { new Notice(t("backend.unknown")); return; }
+    new Notice(t("backend.detected", BACKENDS[r.backend].label));
+    await this.saveBackend(cfg.id, r.backend);
+    this.refreshUi();
   }
 
   /** Schlüsselbund-Status als sichtbarer Text — bewusst als render-Hatch mit eigenem DOM-Knoten

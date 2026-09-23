@@ -76,3 +76,11 @@
 .lem-cap-label { font-size: var(--font-ui-smaller); color: var(--text-muted); margin-right: 10px; }
 .lem-row-warn { flex: 0 0 100%; font-size: var(--font-ui-small); color: var(--text-warning); }
 .lem-row-warn:empty { display: none; }
+
+/* Modelltabelle: Familie-Dropdown + Alias-Textfeld je Zeile. Ohne Mindestbreite schneidet der
+   Platzhalter „Andere Schreibweise von" ab (gemessen 2026-09-23, Screenshot der Settings-UI) —
+   das Textfeld braucht mehr Raum als der Standard-Flex eines Setting-Controls ihm gibt. */
+.lem-models-list .setting-item-control input[type="text"] {
+  flex: 1 1 16em;
+  min-width: 14em;
+}
