@@ -1,7 +1,8 @@
 import { mergeSettings } from "../vendor/kit/settings";
 import type { EndpointConfig } from "../vendor/kit/endpoint_config";
 import { secretIdFor } from "../vendor/kit/secrets";
-import type { Provider, Capability } from "../vendor/kit/endpoint-source";
+import type { Provider, Capability, ApiModelInfo } from "../vendor/kit/endpoint-source";
+import { BACKEND_IDS, FAMILY_IDS, type BackendId, type FamilyId } from "../vendor/kit/sampling-profiles";
 
 export type { Provider, Capability } from "../vendor/kit/endpoint-source";
 
@@ -26,6 +27,8 @@ export interface ManagedEndpoint extends EndpointConfig {
   capabilities: Capability[];
   enabled: boolean;
   secretId?: string;
+  backend?: BackendId;
+  models?: ApiModelInfo[];
 }
 
 export interface ManagerSettings {
@@ -55,6 +58,27 @@ export function labelFromUrl(url: string): string {
 
 function str(v: unknown): string {
   return typeof v === "string" ? v.trim() : "";
+}
+
+function backendOf(raw: unknown): BackendId | undefined {
+  return typeof raw === "string" && (BACKEND_IDS as readonly string[]).includes(raw) ? (raw as BackendId) : undefined;
+}
+
+function modelsOf(raw: unknown): ApiModelInfo[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out: ApiModelInfo[] = [];
+  for (const r of raw) {
+    if (typeof r !== "object" || r === null) continue;
+    const o = r as Record<string, unknown>;
+    const id = str(o.id);
+    if (!id) continue;
+    const row: ApiModelInfo = { id };
+    if (typeof o.family === "string" && (FAMILY_IDS as readonly string[]).includes(o.family)) row.family = o.family as FamilyId;
+    const alias = str(o.aliasOf);
+    if (alias && alias !== id) row.aliasOf = alias;
+    out.push(row);
+  }
+  return out;
 }
 
 function capabilitiesOf(raw: unknown): Capability[] {
@@ -89,6 +113,10 @@ export function normalizeEndpointEntry(raw: unknown, mint: () => string): Manage
   };
   if (model) out.model = model;
   if (secretId) out.secretId = secretId;
+  const backend = backendOf(r.backend);
+  if (backend) out.backend = backend;
+  const models = modelsOf(r.models);
+  if (models && models.length) out.models = models;
   return out;
 }
 

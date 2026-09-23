@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.37.0, src/testing/obsidian-mock.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.41.0, src/testing/obsidian-mock.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 // Self-contained Obsidian test double for obsidian-kit.
 // - Zero external imports (NOT from "obsidian", NOT from "vitest").
 // - Consumed via vitest `resolve.alias` as a drop-in for `import ... from "obsidian"`,
@@ -106,6 +106,15 @@ export function makeFakeEl(tagName = "DIV"): any {
      *  über die Reihenfolge der Kinder ist nur dort belastbar, wo kein Knoten umgehängt
      *  wurde (der Modell-Picker hängt seine Komponenten aus `controlEl` in den Slot um). */
     appendChild: (c: any) => { if (c && typeof c === "object") c.parentElement = el; children.push(c); return c; },
+    /** `ref === null` haengt ans Ende an, wie im echten DOM. Fehlt `ref` im eigenen
+     *  Kinder-Array, wird ebenfalls ans Ende angehaengt statt zu werfen (Fake-Element
+     *  ist tolerant, kein Spezifikations-Double). */
+    insertBefore: (c: any, ref: any) => {
+      if (c && typeof c === "object") c.parentElement = el;
+      const i = ref === null || ref === undefined ? -1 : children.indexOf(ref);
+      if (i < 0) children.push(c); else children.splice(i, 0, c);
+      return c;
+    },
     removeChild: (c: any) => {
       const i = children.indexOf(c);
       if (i >= 0) children.splice(i, 1);
@@ -217,13 +226,15 @@ export class TextComponent {
   inputEl: any = makeFakeEl("INPUT");
   protected _value = "";
   onChangeCB: ((v: string) => any) | null = null;
+  placeholder = "";
+  disabled = false;
   constructor() {
     this.inputEl.__component = this;
   }
   getValue(): string { return this._value; }
   setValue(v: string): this { this._value = String(v ?? ""); return this; }
-  setPlaceholder(_p: string): this { return this; }
-  setDisabled(_d: boolean): this { return this; }
+  setPlaceholder(p: string): this { this.placeholder = String(p ?? ""); return this; }
+  setDisabled(d: boolean): this { this.disabled = Boolean(d); return this; }
   onChange(cb: (v: string) => any): this { this.onChangeCB = cb; return this; }
 }
 export class TextAreaComponent extends TextComponent {
@@ -250,8 +261,9 @@ export class DropdownComponent {
   options: Record<string, string> = {};
   protected _value = "";
   onChangeCB: ((v: string) => any) | null = null;
-  constructor() {
+  constructor(containerEl?: any) {
     this.selectEl.__component = this;
+    if (containerEl?.appendChild) containerEl.appendChild(this.selectEl);
   }
   addOption(value: string, display: string): this { this.options[value] = display; return this; }
   addOptions(options: Record<string, string>): this { Object.assign(this.options, options); return this; }

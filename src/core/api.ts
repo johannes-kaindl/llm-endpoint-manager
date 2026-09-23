@@ -36,12 +36,16 @@ function toApiEndpoint(e: ManagedEndpoint, secrets: SecretStore): ApiEndpoint {
     enabled: e.enabled, hasSecret: e.secretId !== undefined && secrets.has(e.secretId),
   };
   if (e.model) out.defaultModel = e.model;
+  if (e.backend) out.backend = e.backend;
+  if (e.models) out.models = e.models;
   return out;
 }
 
 function toResolved(m: Materialized): ResolvedEndpoint {
   const out: ResolvedEndpoint = { id: m.ep.id, label: m.ep.label, config: m.config };
   if (m.ep.model) out.defaultModel = m.ep.model;
+  if (m.ep.backend) out.backend = m.ep.backend;
+  if (m.ep.models) out.models = m.ep.models;
   return out;
 }
 

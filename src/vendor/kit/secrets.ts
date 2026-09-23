@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.37.0, src/pure/secrets.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.41.0, src/pure/secrets.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 /** Schlüsselbund-Vertrag, obsidian-frei. Herkunft: calendar-notes/src/obsidian/secrets.ts
  *  (2026-08, danach byte-nah in anysource-sideloader, mailstone, yijing-oracle — n=4, damit
  *  Kit-reif). Zusatz gegenüber der Vorlage: `delete`, weil ein gelöschter Endpunkt sein

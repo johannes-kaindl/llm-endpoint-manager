@@ -154,7 +154,7 @@ relayer_pure() { # relayer_pure <vendored-file>
 
 mkdir -p src/vendor/kit src/vendor/kit-obsidian
 
-PURE_MODULE="endpoint endpoint_config endpoint_diagnostics model-choice model-list-cache timeout i18n settings secrets endpoint-source"
+PURE_MODULE="endpoint endpoint_config endpoint_diagnostics model-choice model-list-cache timeout i18n settings secrets reasoning capabilities sampling-profiles endpoint-source"
 # Die gekoppelte Schicht (importiert `obsidian`). endpoint-list und model-picker tragen einen
 # Querimport auf ../vendor/code-kit/{pure,web}/ bzw. ../pure/ und brauchen deshalb den relayer
 # (Fallgruppe unten); secrets.ts importiert ../pure/secrets → ebenfalls relayer.

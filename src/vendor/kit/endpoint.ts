@@ -1,4 +1,4 @@
-// vendored from code-kit@0.6.0, src/ts/pure/endpoint.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from code-kit@0.7.0, src/ts/pure/endpoint.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 /** Normalisiert eine Endpoint-Eingabe: trailing Slashes + ein trailing `/v1` strippen.
  *  Die Clients hängen `/v1/...` selbst an — enthielte der konfigurierte Endpoint bereits
  *  ein `/v1`, entstünde `…/v1/v1/...` (manche Server, z.B. LM Studio, antworten darauf mit

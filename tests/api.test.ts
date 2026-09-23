@@ -114,3 +114,28 @@ describe("api-types Re-Export", () => {
     expect(LLM_ENDPOINT_MANAGER_API_VERSION).toBe(1);
   });
 });
+
+describe("backend and models (additive, API v1)", () => {
+  const withMeta = () => loadSettings({ endpoints: [{
+    id: "o", label: "LGS", url: "https://h/api", capabilities: ["chat"], model: "verdigado-pro",
+    backend: "openwebui", models: [{ id: "verdigado-pro", family: "gpt-oss" }],
+  }] });
+  it("list/get carry backend and models, version stays 1", () => {
+    const { d } = deps(withMeta());
+    const { api } = createManagerApi(d);
+    expect(api.version).toBe(1);
+    expect(isLlmEndpointManagerApi(api)).toBe(true);
+    expect(api.get("o")).toMatchObject({ backend: "openwebui", models: [{ id: "verdigado-pro", family: "gpt-oss" }], defaultModel: "verdigado-pro" });
+  });
+  it("resolve and materialize carry backend and models", async () => {
+    const { d } = deps(withMeta());
+    const { api } = createManagerApi(d);
+    expect(await api.resolve("chat")).toMatchObject({ id: "o", backend: "openwebui", models: [{ id: "verdigado-pro", family: "gpt-oss" }] });
+    expect(await api.materialize("o")).toMatchObject({ backend: "openwebui" });
+  });
+  it("endpoints without meta stay byte-identical to before (existing consumers)", () => {
+    const { d } = deps(base());
+    const { api } = createManagerApi(d);
+    expect(api.get("a")).toEqual({ id: "a", label: "A", url: "http://a", provider: "openai", capabilities: ["chat"], enabled: true, hasSecret: false });
+  });
+});

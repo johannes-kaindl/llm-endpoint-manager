@@ -1,4 +1,4 @@
-// vendored from code-kit@0.6.0, src/ts/pure/endpoint_diagnostics.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from code-kit@0.7.0, src/ts/pure/endpoint_diagnostics.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 export type EndpointStatusKind =
   | "ok" | "refused" | "unknown-host" | "timeout" | "not-an-llm-api" | "unauthorized" | "unknown";
 

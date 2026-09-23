@@ -52,3 +52,24 @@ describe("Hilfen", () => {
     expect(labelFromUrl("kaputt")).toBe("kaputt");
   });
 });
+
+describe("models and backend", () => {
+  it("keeps valid model rows and backend, and toPersisted keeps them", () => {
+    const s = loadSettings({ endpoints: [{
+      id: "e1", label: "LGS", url: "https://h/api", capabilities: ["chat"],
+      backend: "openwebui",
+      models: [{ id: "verdigado-pro", family: "gpt-oss" }, { id: "a", aliasOf: "b" }],
+    }] });
+    expect(s.endpoints[0]!.backend).toBe("openwebui");
+    expect(s.endpoints[0]!.models).toEqual([{ id: "verdigado-pro", family: "gpt-oss" }, { id: "a", aliasOf: "b" }]);
+    expect(toPersisted(s).endpoints[0]!.models).toEqual(s.endpoints[0]!.models);
+  });
+  it("drops unknown backend, unknown family, self-alias and rows without id", () => {
+    const s = loadSettings({ endpoints: [{
+      id: "e1", url: "http://h", capabilities: ["chat"],
+      backend: "vllm", models: [{ id: "m", family: "llama", aliasOf: "m" }, { family: "gemma4" }, "x"],
+    }] });
+    expect(s.endpoints[0]!.backend).toBeUndefined();
+    expect(s.endpoints[0]!.models).toEqual([{ id: "m" }]);
+  });
+});
