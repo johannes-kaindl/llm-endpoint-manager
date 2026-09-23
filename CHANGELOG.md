@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-09-23
+
 ### Added
 - Each endpoint can now carry a model table (family, alias) and a backend (LM Studio, Ollama, Open WebUI,
   OpenAI-compatible). Family is suggested from the model name (`familyFromName`) and can be overridden per
