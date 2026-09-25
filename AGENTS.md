@@ -6,7 +6,7 @@ Workspace-weite Standards (comply-or-explain): siehe [`../../workspace/_docs/CON
 
 **Profil:** `ts-node` · `obsidian-plugin`.
 
-**Stand 2026-09-15: 0.1.0 released.** Alle 13 Tasks aus Plan 2 umgesetzt: Kern-Datenmodell,
+**Stand 2026-09-25: 0.2.2 (Sampling-Profile-Modelltabelle seit 0.2.0); Plan 2 seit 0.1.0 released.** Alle 13 Tasks aus Plan 2 umgesetzt: Kern-Datenmodell,
 Plugin-API v1 (`createManagerApi`, „Fehler sind Werte"), HTTP-Probe, Settings-Tab (Endpunkt-Liste,
 Protokoll/Fähigkeiten/Aktiv-Schalter), i18n, Schlüsselbund-Verdrahtung (`obsidianSecretStore`),
 GUI-Smoke 9/9. Vendoring auf obsidian-kit 0.36.1 + code-kit 0.6.0, `npm run gate` grün. Tag + Forgejo-Release
