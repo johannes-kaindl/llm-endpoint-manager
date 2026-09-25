@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.2] — 2026-09-25
+
 ### Fixed
 - The connection check in the settings tab (status icon, model list) and the backend "Detect" button now send the token from the keychain. Before, a bearer-protected server answered 401 and the row read "unreachable" although the token was right, while plugins using the API worked.
 - The Endpoint-, Protocol-, Capabilities- and "Enabled" rows of an endpoint had lost their visible labels (the "Enabled" toggle looked unlabelled). Labels are back, and each capability toggle stays together with its name in a narrow window.
