@@ -18,9 +18,10 @@ export function createReachabilityCache(now: () => number, ttlMs: number = REACH
   const entries = new Map<string, { reachable: boolean; at: number }>();
   return {
     get(url) {
-      const e = entries.get(normalizeEndpoint(url));
+      const key = normalizeEndpoint(url);
+      const e = entries.get(key);
       if (!e) return null;
-      if (now() - e.at > ttlMs) { entries.delete(normalizeEndpoint(url)); return null; }
+      if (now() - e.at > ttlMs) { entries.delete(key); return null; }
       return e.reachable;
     },
     set(url, reachable) { entries.set(normalizeEndpoint(url), { reachable, at: now() }); },

@@ -525,6 +525,23 @@ async function main(): Promise<void> {
     `);
     record("D1 Modellblock sichtbar — Zeile für verdigado-pro", modelRowVisible.ok, `Zeile vorhanden=${modelRowVisible.ok}`);
 
+    // E1 — jede Zeile der Zusatzzeile ist SICHTBAR beschriftet (Layout-Regel, kein DOM-Vorhandensein:
+    // die Kit-Regel `.okit-ep-row .setting-item-info { display: none }` blendete Bezeichnung,
+    // Protokoll und „Aktiv“ aus, obwohl setName sie im DOM anlegte — gemeldet 2026-09-25).
+    const extraLabels = await settings.cdp.evaluate<{ name: string; visible: boolean }[]>(`
+      const shown = (el) => { if (!el) return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(el).display !== "none"; };
+      const extra = ${settings.el(`root.querySelector(".okit-ep-extra")`)};
+      if (!extra) return [];
+      const out = Array.from(extra.querySelectorAll(".setting-item")).map((it) => ({ name: it.querySelector(".setting-item-name")?.textContent ?? "(ohne Name)", visible: shown(it.querySelector(".setting-item-name")) && (it.querySelector(".setting-item-name")?.textContent ?? "").trim() !== "" }));
+      for (const l of extra.querySelectorAll(".lem-cap-label")) out.push({ name: "cap:" + l.textContent, visible: shown(l) });
+      return out;
+    `);
+    record(
+      "E1 Zusatzzeile: Bezeichnung, Protokoll, Fähigkeiten, Aktiv sind sichtbar beschriftet",
+      extraLabels.length >= 8 && extraLabels.every((l) => l.visible),
+      JSON.stringify(extraLabels),
+    );
+
     // D2 — Familie fuer den Alias per Dropdown setzen, Settings neu laden, Wert bleibt.
     const familySetOk = await settings.cdp.evaluate<{ ok: boolean }>(`
       const row = Array.from(${settings.el(`root.querySelectorAll(".setting-item")`)}).find((r) => {

@@ -5,7 +5,7 @@ import { renderSettingDefinitions, settingBodyHost, refreshSettingsTab } from ".
 import { buildEndpointList, type EndpointListStrings, type EndpointSecretHook } from "../vendor/kit-obsidian/endpoint-list";
 import { createModelListCache, type ModelListCache } from "../vendor/kit/model-list-cache";
 import type { EndpointStatusKind } from "../vendor/kit/endpoint_diagnostics";
-import type { EndpointRole } from "../vendor/kit/endpoint_config";
+import { authHeaders, type EndpointRole } from "../vendor/kit/endpoint_config";
 import { normalizeEndpoint } from "../vendor/kit/endpoint";
 import { BACKEND_IDS, BACKENDS, FAMILIES, FAMILY_IDS, type BackendId, type FamilyId } from "../vendor/kit/sampling-profiles";
 import { probeBaseUrl, probeEndpoint } from "../vendor/kit/capabilities";
@@ -92,6 +92,15 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
     };
   }
 
+  /** Der gespeicherte Endpunkt trägt nie ein `apiKey` (`toPersisted`); die Zeilen-Prüfung und die
+   *  Modell-Liste brauchen es aber, sonst antwortet ein Bearer-geschützter Server mit 401 und
+   *  die Zeile meldet „nicht erreichbar", obwohl der Token stimmt. Bewusst nicht `materialize()`:
+   *  das verwirft deaktivierte Einträge und Einträge ohne Token, die Zeile soll sie trotzdem prüfen. */
+  private withToken(cfg: ManagedEndpoint): ManagedEndpoint {
+    const token = cfg.secretId ? this.plugin.secrets.get(cfg.secretId) : null;
+    return token ? { ...cfg, apiKey: token } : cfg;
+  }
+
   private secretHook(): EndpointSecretHook<ManagedEndpoint> {
     return {
       available: this.plugin.keychain,
@@ -107,7 +116,7 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
     return eps.map((e) => {
       if (e.id) return e;
       const preset = PRESETS.find((p) => normalizeEndpoint(p.url) === normalizeEndpoint(e.url));
-      return { ...e, id: newId(), label: e.label || labelFromUrl(e.url), provider: preset?.provider ?? "openai",
+      return { ...e, id: newId(), label: e.label || labelFromUrl(e.url) || preset?.label || t("row.newEndpoint"), provider: preset?.provider ?? "openai",
         capabilities: preset ? [...preset.capabilities] : ["chat"], enabled: true };
     });
   }
@@ -127,7 +136,7 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
         this.plugin.settings.endpoints = this.complete(eps);
       },
       active: () => null,
-      clientFor: (cfg) => clientFor(cfg, cfg.provider ?? "openai"),
+      clientFor: (cfg) => clientFor(this.withToken(cfg), cfg.provider ?? "openai"),
       save: () => this.plugin.saveSettings(),
       reconnect: async () => { this.plugin.handle.reachability.clear(); },
       rerender: () => { this.refreshUi(); },
@@ -148,7 +157,7 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
     new Setting(host).setName(t("row.label")).addText((tx) => {
       tx.setValue(cfg.label);
       tx.inputEl.setAttribute("aria-label", t("row.label"));
-      tx.inputEl.addEventListener("blur", () => { void save((e) => { e.label = tx.getValue().trim() || labelFromUrl(e.url); }); });
+      tx.inputEl.addEventListener("blur", () => { void save((e) => { e.label = tx.getValue().trim() || labelFromUrl(e.url) || t("row.newEndpoint"); }); });
     });
     new Setting(host).setName(t("row.provider")).addDropdown((d) => {
       for (const p of PROVIDERS) d.addOption(p, t(`row.provider.${p}`));
@@ -162,6 +171,9 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
     });
     const caps = new Setting(host).setName(t("row.capabilities"));
     for (const c of CAPABILITIES) {
+      // Toggle und Beschriftung als eine Einheit, damit ein schmales Fenster sie nicht trennt
+      // (das Label rutschte sonst als Einzelzeile unter den Toggle, s. Screenshot 2026-09-25).
+      const unit = caps.controlEl.createDiv({ cls: "lem-cap" });
       caps.addToggle((tg) => {
         tg.setValue(cfg.capabilities.includes(c)).setTooltip(t(`cap.${c}`));
         tg.toggleEl.setAttribute("aria-label", t(`cap.${c}`));
@@ -169,7 +181,9 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
           e.capabilities = on ? [...new Set([...e.capabilities, c])] : e.capabilities.filter((x) => x !== c);
         }).then(() => { this.syncCapWarning(host, cfg.id); }); });
       });
-      caps.controlEl.createSpan({ cls: "lem-cap-label", text: t(`cap.${c}`) });
+      const toggleEl = caps.controlEl.lastElementChild;
+      if (toggleEl && toggleEl !== unit) unit.appendChild(toggleEl);
+      unit.createSpan({ cls: "lem-cap-label", text: t(`cap.${c}`) });
     }
     new Setting(host).setName(t("row.enabled")).addToggle((tg) => {
       tg.setValue(cfg.enabled);
@@ -262,7 +276,8 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
   /** `capabilityFetch` fragt nur `/api/config`, `/api/show`, `/api/v1/models`, `/api/v0/models`
    *  — reine GET/HEAD-artige Lesevorgänge, kein JIT-Load eines Modells (Auftragsregel 12). */
   private async detectBackend(cfg: ManagedEndpoint): Promise<void> {
-    const r = await probeEndpoint(capabilityFetch, probeBaseUrl(cfg.url), cfg.model ?? "");
+    const auth = authHeaders(this.withToken(cfg).apiKey);
+    const r = await probeEndpoint((req) => capabilityFetch({ ...req, headers: { ...auth, ...req.headers } }), probeBaseUrl(cfg.url), cfg.model ?? "");
     if (r.backend === "unknown") { new Notice(t("backend.unknown")); return; }
     new Notice(t("backend.detected", BACKENDS[r.backend].label));
     await this.saveBackend(cfg.id, r.backend);

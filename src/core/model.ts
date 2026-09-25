@@ -15,6 +15,9 @@ export type _AlleProviderAbgedeckt = Exclude<Provider, (typeof PROVIDERS)[number
 
 export const CAPABILITIES = ["chat", "embedding", "vision", "image"] as const satisfies readonly Capability[];
 export type _AlleCapabilityAbgedeckt = Exclude<Capability, (typeof CAPABILITIES)[number]> extends never ? true : never;
+/** Die Typen oben prüfen nichts, solange niemand sie belegt: erst die Zuweisung erzwingt `never`-Freiheit. */
+export const _pruefeProvider: _AlleProviderAbgedeckt = true;
+export const _pruefeCapability: _AlleCapabilityAbgedeckt = true;
 
 /** Ein Endpunkt des Managers. `extends EndpointConfig`, damit der Kit-Listen-Editor
  *  (buildEndpointList<T>) URL, Reihenfolge und Modell unverändert bedient — `model` ist hier das
@@ -47,7 +50,11 @@ export function newId(): string {
   return crypto.randomUUID();
 }
 
+/** Host (mit Port) als Anzeigename; leer, wenn die Adresse nur ein Schema ohne Host ist — der
+ *  Preset „OpenAI-compatible cloud“ startet mit `https://`, und das ist kein Name. Der Aufrufer
+ *  entscheidet den Ersatz (Preset-Name, i18n-Platzhalter). */
 export function labelFromUrl(url: string): string {
+  if (/^[a-z][a-z0-9+.-]*:\/*$/i.test(url.trim())) return "";
   try {
     const u = new URL(url);
     return u.host || url;
@@ -99,7 +106,8 @@ export function normalizeEndpointEntry(raw: unknown, mint: () => string): Manage
   const r = raw as Record<string, unknown>;
   const url = str(r.url);
   if (!url) return null;
-  const provider = (PROVIDERS as readonly string[]).includes(str(r.provider)) ? (str(r.provider) as Provider) : "openai";
+  const rawProvider = str(r.provider);
+  const provider = (PROVIDERS as readonly string[]).includes(rawProvider) ? (rawProvider as Provider) : "openai";
   const caps = capabilitiesOf(r.capabilities);
   const model = str(r.model);
   const secretId = str(r.secretId);

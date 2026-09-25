@@ -103,12 +103,15 @@ export function createManagerApi(deps: ApiDeps): ManagerApiHandle {
       // try/catch prüft, darf das nie als unbehandelte Rejection sehen.
       await deps.replaceSettings(toPersisted({ version: 1, endpoints: out.endpoints }));
       for (const e of out.endpoints) reachability.invalidate(e.url);
-      notifyChanged();
+      // Erst NACH dem Secret-Schreiben melden: ein synchroner „changed“-Listener, der sofort
+      // `list()`/`get()` ruft, soll `hasSecret` des gerade importierten Endpunkts schon sehen.
       try {
         for (const s of out.secrets) deps.secrets.set(s.secretId, s.value);
       } catch {
+        notifyChanged();
         return { error: "secret-missing" } satisfies ApiError;
       }
+      notifyChanged();
       return out.result satisfies ImportResult;
     },
     on(_event, cb) { listeners.add(cb); return () => { listeners.delete(cb); }; },

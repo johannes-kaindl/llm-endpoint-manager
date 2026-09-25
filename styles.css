@@ -73,7 +73,18 @@
 /* Zusatzzeile je Endpunkt (Label, Protokoll, Fähigkeiten, aktiv) — okit-ep-extra kommt aus dem Kit. */
 .okit-ep-extra .setting-item { border: none; padding: 4px 0; }
 .okit-ep-extra .setting-item-name { font-size: var(--font-ui-small); color: var(--text-muted); }
-.lem-cap-label { font-size: var(--font-ui-smaller); color: var(--text-muted); margin-right: 10px; }
+.lem-cap-label { font-size: var(--font-ui-smaller); color: var(--text-muted); }
+.lem-cap { display: inline-flex; align-items: center; gap: var(--size-4-2); margin-right: 10px; }
+/* Die Kit-Regel `.okit-ep-row .setting-item-info { display: none }` blendet den Info-Block der
+   ZEILE aus (leer, s. o.) — sie trifft aber auch die verschachtelten Zusatzzeilen, und dort
+   trägt er die Beschriftung von Bezeichnung, Protokoll und „Aktiv“. Hier gezielt zurück. */
+.okit-ep-extra .setting-item .setting-item-info { display: block; }
+.okit-ep-extra .setting-item .setting-item-control { width: auto; flex-wrap: nowrap; }
+.okit-ep-extra .setting-item { flex-wrap: wrap; gap: var(--size-4-2); }
+/* Die Fähigkeiten-Beschriftung ist ein ganzer Satz — eigene Zeile über den vier Schaltern statt
+   daneben gequetscht (schmales Fenster, Screenshot 2026-09-25). */
+.okit-ep-extra .setting-item:has(.lem-cap) .setting-item-info { flex: 1 1 100%; text-align: left; }
+.okit-ep-extra .setting-item:has(.lem-cap) .setting-item-control { flex-wrap: wrap; justify-content: flex-start; }
 .lem-row-warn { flex: 0 0 100%; font-size: var(--font-ui-small); color: var(--text-warning); }
 .lem-row-warn:empty { display: none; }
 
@@ -84,3 +95,6 @@
   flex: 1 1 16em;
   min-width: 14em;
 }
+
+/* Schlüsselbund-Status und Konsumenten-Leerzustand: Typografie wie die Nachbartexte (Review-Fund 11). */
+.lem-keychain-status, .lem-consumers-empty { font-size: var(--font-ui-small); color: var(--text-muted); }

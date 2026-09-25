@@ -76,6 +76,14 @@ describe("createManagerApi", () => {
     h.notifyChanged();
     expect(cb).toHaveBeenCalledTimes(1);
   });
+  it("importEndpoints: der changed-Listener sieht das Secret schon (Meldung erst nach dem Schreiben)", async () => {
+    const { d, secrets } = deps(base());
+    const h = createManagerApi(d);
+    const seen: (string | null)[] = [];
+    h.api.on("changed", () => { seen.push(secrets.get("llm-endpoint-manager-id1")); });
+    await h.api.importEndpoints([{ url: "http://c", apiKey: "sk-c" }], "vision");
+    expect(seen).toEqual(["sk-c"]);
+  });
   it("importEndpoints wirft nie, wenn secrets.set wirft — gibt secret-missing als Wert zurück", async () => {
     const throwingSecrets: import("../src/core/api").ApiDeps["secrets"] = {
       get: () => null, has: () => false,

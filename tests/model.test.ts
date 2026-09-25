@@ -50,6 +50,8 @@ describe("Hilfen", () => {
     expect(labelFromUrl("http://localhost:1234/v1")).toBe("localhost:1234");
     expect(labelFromUrl("https://api.openai.com")).toBe("api.openai.com");
     expect(labelFromUrl("kaputt")).toBe("kaputt");
+    expect(labelFromUrl("https://")).toBe("");   // Platzhalter ohne Host ist kein Label
+    expect(labelFromUrl("http:")).toBe("");
   });
 });
 

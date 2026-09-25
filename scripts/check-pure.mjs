@@ -18,13 +18,19 @@ function walk(dir) {
   });
 }
 
-const offenders = walk(ROOT)
-  .filter((f) => f.endsWith(".ts"))
-  .filter((f) => FORBIDDEN.test(readFileSync(f, "utf8")));
+const files = walk(ROOT).filter((f) => f.endsWith(".ts"));
+// CORE-TEST-19: „nichts gemessen“ ist kein Erfolg. Der ENOENT-Guard oben war für das leere Gerüst
+// richtig; jetzt, wo src/core existiert, wäre ein leerer Lauf (falsches CWD, umbenannter Ordner)
+// ein stilles Grün.
+if (files.length === 0) {
+  console.error(`check:pure: keine .ts-Datei unter ${ROOT} gefunden — nichts geprüft (falsches Verzeichnis?)`);
+  process.exit(1);
+}
+const offenders = files.filter((f) => FORBIDDEN.test(readFileSync(f, "utf8")));
 
 if (offenders.length > 0) {
   console.error("src/core darf obsidian nicht importieren:");
   for (const f of offenders) console.error(`  ${f}`);
   process.exit(1);
 }
-console.log(`check:pure: ${ROOT} ist frei von obsidian`);
+console.log(`check:pure: ${ROOT} ist frei von obsidian (${files.length} Dateien geprüft)`);

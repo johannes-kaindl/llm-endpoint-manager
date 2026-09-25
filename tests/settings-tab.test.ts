@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { makeFakeApp, Setting, TextComponent, ToggleComponent, DropdownComponent } from "./vendor/kit/obsidian-mock";
+import { requestUrl } from "obsidian";
+import { makeFakeApp, Setting, TextComponent, ToggleComponent, DropdownComponent, ButtonComponent } from "./vendor/kit/obsidian-mock";
 import LlmEndpointManagerPlugin from "../src/main";
 import { LlmEndpointManagerSettingTab } from "../src/obsidian/settings-tab";
 
@@ -82,5 +83,50 @@ describe("LlmEndpointManagerSettingTab", () => {
     expect(Object.keys(dd.options)).toEqual(["", "qwen3.8", "qwen3.6", "gemma4", "gpt-oss"]);
     const backend = settings.find((s) => s.components.some((c) => c instanceof DropdownComponent && (c as DropdownComponent).getValue() === "openwebui"));
     expect(backend).toBeDefined();
+  });
+  it("schickt die Zeilen-Prüfung mit dem Token aus dem Schlüsselbund (Authorization-Header)", async () => {
+    // Regression: die Settings-Probe nahm den rohen gespeicherten Endpunkt (ohne apiKey) und
+    // bekam von einem Bearer-geschützten Server 401 — „nicht erreichbar", obwohl der Token stimmt.
+    const rq = requestUrl as unknown as { mockClear(): void; mock: { calls: unknown[][] } };
+    rq.mockClear();
+    const app = makeFakeApp();
+    const data = { endpoints: [{ id: "e1", url: "https://h/api", provider: "openai", capabilities: ["chat"], secretId: "sid1" }] };
+    const p = new LlmEndpointManagerPlugin(app, { id: "llm-endpoint-manager", name: "x", version: "0", minAppVersion: "1.11.4", description: "", author: "", authorUrl: "", isDesktopOnly: false, dir: "" });
+    (p as unknown as { loadData: () => Promise<unknown> }).loadData = () => Promise.resolve(data);
+    (p as unknown as { saveData: () => Promise<void> }).saveData = () => Promise.resolve();
+    await p.onload();
+    p.secrets.set("sid1", "tok-123");
+    new LlmEndpointManagerSettingTab(app, p).display();
+    await new Promise((r) => setTimeout(r, 20));
+    const calls = rq.mock.calls.map((c) => c[0] as { url: string; headers?: Record<string, string> }).filter((a) => a.url.startsWith("https://h/api"));
+    expect(calls.length).toBeGreaterThan(0);
+    for (const a of calls) expect(a.headers?.Authorization).toBe("Bearer tok-123");
+  });
+  it("schickt die Backend-Erkennung mit dem Token aus dem Schlüsselbund", async () => {
+    const rq = requestUrl as unknown as { mockClear(): void; mock: { calls: unknown[][] } };
+    const app = makeFakeApp();
+    const data = { endpoints: [{ id: "e1", url: "https://h/api", provider: "openai", capabilities: ["chat"], secretId: "sid1" }] };
+    const p = new LlmEndpointManagerPlugin(app, { id: "llm-endpoint-manager", name: "x", version: "0", minAppVersion: "1.11.4", description: "", author: "", authorUrl: "", isDesktopOnly: false, dir: "" });
+    (p as unknown as { loadData: () => Promise<unknown> }).loadData = () => Promise.resolve(data);
+    (p as unknown as { saveData: () => Promise<void> }).saveData = () => Promise.resolve();
+    await p.onload();
+    p.secrets.set("sid1", "tok-123");
+    const el = (() => { const t = new LlmEndpointManagerSettingTab(app, p); t.display(); return t.containerEl as unknown as FakeEl; })();
+    await new Promise((r) => setTimeout(r, 20));
+    rq.mockClear();
+    const btn = settingsIn(el).flatMap((s) => s.components).find((c): c is ButtonComponent => c instanceof ButtonComponent && c.textValue.length > 0 && !!c.clickCB && c.textValue !== "Check connection" && /detect|erkennen/i.test(c.textValue))!;
+    expect(btn).toBeDefined();
+    btn.clickCB!();
+    await new Promise((r) => setTimeout(r, 20));
+    const calls = rq.mock.calls.map((c) => c[0] as { url: string; headers?: Record<string, string> }).filter((a) => a.url.startsWith("https://h/api/config") || a.url.startsWith("https://h/api/"));
+    expect(calls.length).toBeGreaterThan(0);
+    for (const a of calls) expect(a.headers?.Authorization).toBe("Bearer tok-123");
+  });
+  it("gibt einem Preset ohne Host seinen Preset-Namen als Label, nicht „https://“", async () => {
+    const { tab: t } = await tab({});
+    const complete = (t as unknown as { complete: (e: { url: string; label?: string }[]) => { label: string }[] }).complete.bind(t);
+    expect(complete([{ url: "https://" }])[0]?.label).toBe("OpenAI-compatible cloud");
+    expect(complete([{ url: "http://localhost:1234" }])[0]?.label).toBe("localhost:1234");   // mit Host bleibt es der Host
+    expect(complete([{ url: "kaputt://" }])[0]?.label).toBe("New endpoint");   // kein Preset, kein Host → Platzhalter (en im Mock)
   });
 });

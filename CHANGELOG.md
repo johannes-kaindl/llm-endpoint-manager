@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- The connection check in the settings tab (status icon, model list) and the backend "Detect" button now send the token from the keychain. Before, a bearer-protected server answered 401 and the row read "unreachable" although the token was right, while plugins using the API worked.
+- The Endpoint-, Protocol-, Capabilities- and "Enabled" rows of an endpoint had lost their visible labels (the "Enabled" toggle looked unlabelled). Labels are back, and each capability toggle stays together with its name in a narrow window.
+- The "OpenAI-compatible cloud" preset no longer names the new endpoint `https://`; it gets the preset name, or "New endpoint" when there is no host. Endpoints created earlier keep their label until edited.
+
+### Changed
+- The keychain status line now says what it means for you ("Your token is safe: it is not written into your notes or plugin settings files") instead of naming the storage.
+- `changed` listeners of `importEndpoints` are notified after the tokens are written, so `hasSecret` is already correct inside the listener.
+- Provider/capability lists are now checked by the compiler against the kit unions (the guard types were declared but never enforced); `check:pure` fails when it finds no file to check.
+
 ## [0.2.1] — 2026-09-24
 
 ### Changed
