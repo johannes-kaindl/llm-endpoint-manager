@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.41.0, src/obsidian/endpoint-list.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.43.0, src/obsidian/endpoint-list.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 // ONE mechanical deviation from verbatim: kit-internal imports (../pure/ and ../vendor/code-kit/{pure,web}/) → ../kit/ (vendor layout); reproduce on every re-vendor, nothing else may differ.
 /* Geordneter Endpunkt-Fallback-Listen-Editor: eine Setting-Zeile je Endpunkt (URL ·
  * Schlüssel · Modell-Override · „zuerst verwenden" · entfernen) plus Adder-Zeile,
@@ -502,14 +502,14 @@ export const ENDPOINT_LIST_CSS = `
    buildEndpointList) — ohne order würden die beiden Icons hinter die volle-Breite-Zeile
    rutschen statt in der Feldreihe zu bleiben. order:1 hält die Rolle visuell zuletzt,
    unabhängig davon, was später noch an controlEl angehängt wird. */
-.okit-ep-row .setting-item-control .okit-ep-state {
+.okit-ep-row > .setting-item-control .okit-ep-state {
   flex: 0 0 100%;
   order: 1;
   font-size: var(--font-ui-smaller);
   color: var(--text-muted);
   margin-top: 2px;
 }
-.okit-ep-row .setting-item-control .okit-ep-state.is-active {
+.okit-ep-row > .setting-item-control .okit-ep-state.is-active {
   color: var(--text-normal);
   font-weight: var(--font-bold);
 }
@@ -518,33 +518,35 @@ export const ENDPOINT_LIST_CSS = `
 .okit-ep-busy { pointer-events: none; opacity: 0.6; }
 /* Endpunkt-Zeile: drei Felder (Adresse · Schlüssel · Modell) brauchen die volle Breite.
    Die Beschriftung steht als eigene Zeile darüber, deshalb ist der Info-Block hier leer und
-   darf keinen Platz beanspruchen — sonst quetscht er die Felder (gemeldet 2026-08-04). */
-.okit-ep-row .setting-item-info {
+   darf keinen Platz beanspruchen — sonst quetscht er die Felder (gemeldet 2026-08-04).
+   Kindselektor (>), kein Nachkomme: der extraRow-Host sitzt in controlEl, und ein Setting
+   darin verlor sonst seine Beschriftung (gemessen 2026-09-25, llm-endpoint-manager). */
+.okit-ep-row > .setting-item-info {
   display: none;
 }
-.okit-ep-row .setting-item-control {
+.okit-ep-row > .setting-item-control {
   flex-wrap: wrap;
   justify-content: flex-start;
   gap: var(--size-4-2);
   width: 100%;
 }
-.okit-ep-row .setting-item-control input[type="text"],
-.okit-ep-row .setting-item-control input[type="password"] {
+.okit-ep-row > .setting-item-control input[type="text"],
+.okit-ep-row > .setting-item-control input[type="password"] {
   flex: 1 1 12em;
   min-width: 8em;
 }
 /* Reservierter Platz für das Modell-Dropdown (Auffüllen der Zeile erst nach dem geladenen
    Promise, siehe buildEndpointList). Selbst ein Flex-Container, damit Dropdown/Freitext + der
    „Modelle abrufen"-Knopf innerhalb genauso mitwachsen wie URL/Schlüssel daneben. */
-.okit-ep-row .setting-item-control .okit-model-slot {
+.okit-ep-row > .setting-item-control .okit-model-slot {
   display: flex;
   align-items: center;
   gap: var(--size-4-1);
   flex: 1 1 12em;
   min-width: 10em;
 }
-.okit-ep-row .setting-item-control .okit-model-slot select,
-.okit-ep-row .setting-item-control .okit-model-slot input[type="text"] {
+.okit-ep-row > .setting-item-control .okit-model-slot select,
+.okit-ep-row > .setting-item-control .okit-model-slot input[type="text"] {
   flex: 1 1 auto;
   min-width: 0;
 }

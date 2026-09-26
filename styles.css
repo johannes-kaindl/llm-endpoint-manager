@@ -1,6 +1,6 @@
 /* Nur Theme-CSS-Variablen (UI-STANDARD). Praefix lem-. Kein !important. */
 
-/* uebernommen aus src/vendor/kit-obsidian/endpoint-list.ts (ENDPOINT_LIST_CSS), 2026-09-13 */
+/* uebernommen aus src/vendor/kit-obsidian/endpoint-list.ts (ENDPOINT_LIST_CSS), obsidian-kit 0.43.0, 2026-09-26 */
 /* Pro-Zeile-Status der Endpunkt-Fallback-Liste: Form trägt die Bedeutung, Farbe sekundär (WCAG 1.4.1). */
 .okit-ep-status { display: inline-flex; align-items: center; margin-right: 8px; vertical-align: middle; color: var(--text-muted); }
 .okit-ep-status svg { width: 14px; height: 14px; }
@@ -23,14 +23,14 @@
    buildEndpointList) — ohne order würden die beiden Icons hinter die volle-Breite-Zeile
    rutschen statt in der Feldreihe zu bleiben. order:1 hält die Rolle visuell zuletzt,
    unabhängig davon, was später noch an controlEl angehängt wird. */
-.okit-ep-row .setting-item-control .okit-ep-state {
+.okit-ep-row > .setting-item-control .okit-ep-state {
   flex: 0 0 100%;
   order: 1;
   font-size: var(--font-ui-smaller);
   color: var(--text-muted);
   margin-top: 2px;
 }
-.okit-ep-row .setting-item-control .okit-ep-state.is-active {
+.okit-ep-row > .setting-item-control .okit-ep-state.is-active {
   color: var(--text-normal);
   font-weight: var(--font-bold);
 }
@@ -39,33 +39,35 @@
 .okit-ep-busy { pointer-events: none; opacity: 0.6; }
 /* Endpunkt-Zeile: drei Felder (Adresse · Schlüssel · Modell) brauchen die volle Breite.
    Die Beschriftung steht als eigene Zeile darüber, deshalb ist der Info-Block hier leer und
-   darf keinen Platz beanspruchen — sonst quetscht er die Felder (gemeldet 2026-08-04). */
-.okit-ep-row .setting-item-info {
+   darf keinen Platz beanspruchen — sonst quetscht er die Felder (gemeldet 2026-08-04).
+   Kindselektor (>), kein Nachkomme: der extraRow-Host sitzt in controlEl, und ein Setting
+   darin verlor sonst seine Beschriftung (gemessen 2026-09-25, llm-endpoint-manager). */
+.okit-ep-row > .setting-item-info {
   display: none;
 }
-.okit-ep-row .setting-item-control {
+.okit-ep-row > .setting-item-control {
   flex-wrap: wrap;
   justify-content: flex-start;
   gap: var(--size-4-2);
   width: 100%;
 }
-.okit-ep-row .setting-item-control input[type="text"],
-.okit-ep-row .setting-item-control input[type="password"] {
+.okit-ep-row > .setting-item-control input[type="text"],
+.okit-ep-row > .setting-item-control input[type="password"] {
   flex: 1 1 12em;
   min-width: 8em;
 }
 /* Reservierter Platz für das Modell-Dropdown (Auffüllen der Zeile erst nach dem geladenen
    Promise, siehe buildEndpointList). Selbst ein Flex-Container, damit Dropdown/Freitext + der
    „Modelle abrufen"-Knopf innerhalb genauso mitwachsen wie URL/Schlüssel daneben. */
-.okit-ep-row .setting-item-control .okit-model-slot {
+.okit-ep-row > .setting-item-control .okit-model-slot {
   display: flex;
   align-items: center;
   gap: var(--size-4-1);
   flex: 1 1 12em;
   min-width: 10em;
 }
-.okit-ep-row .setting-item-control .okit-model-slot select,
-.okit-ep-row .setting-item-control .okit-model-slot input[type="text"] {
+.okit-ep-row > .setting-item-control .okit-model-slot select,
+.okit-ep-row > .setting-item-control .okit-model-slot input[type="text"] {
   flex: 1 1 auto;
   min-width: 0;
 }
@@ -75,11 +77,9 @@
 .okit-ep-extra .setting-item-name { font-size: var(--font-ui-small); color: var(--text-muted); }
 .lem-cap-label { font-size: var(--font-ui-smaller); color: var(--text-muted); }
 .lem-cap { display: inline-flex; align-items: center; gap: var(--size-4-2); margin-right: 10px; }
-/* Die Kit-Regel `.okit-ep-row .setting-item-info { display: none }` blendet den Info-Block der
-   ZEILE aus (leer, s. o.) — sie trifft aber auch die verschachtelten Zusatzzeilen, und dort
-   trägt er die Beschriftung von Bezeichnung, Protokoll und „Aktiv“. Hier gezielt zurück. */
-.okit-ep-extra .setting-item .setting-item-info { display: block; }
-.okit-ep-extra .setting-item .setting-item-control { width: auto; flex-wrap: nowrap; }
+/* Die Kit-Regeln für die Endpunkt-Zeile sind seit 0.43.0 Kindselektoren (`.okit-ep-row > …`) und treffen
+   die verschachtelten Zusatzzeilen nicht mehr; der frühere Rückbau (`display: block` auf den Info-Block,
+   `width: auto` auf das Control) ist damit überflüssig. */
 .okit-ep-extra .setting-item { flex-wrap: wrap; gap: var(--size-4-2); }
 /* Die Fähigkeiten-Beschriftung ist ein ganzer Satz — eigene Zeile über den vier Schaltern statt
    daneben gequetscht (schmales Fenster, Screenshot 2026-09-25). */
