@@ -6,6 +6,9 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- The keychain status text and the empty-consumers text in the settings tab now sit inside their group box with the same inset as the rows below (they were flush with the box edge).
+
 ### Documentation
 - README rewritten after the workspace standard (features, requirements, install, configuration, how it works), plus a German README.
 - User documentation under `docs/`: an index, a getting-started tutorial and a troubleshooting guide, linked from both READMEs.

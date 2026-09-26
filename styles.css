@@ -97,4 +97,4 @@
 }
 
 /* Schlüsselbund-Status und Konsumenten-Leerzustand: Typografie wie die Nachbartexte (Review-Fund 11). */
-.lem-keychain-status, .lem-consumers-empty { font-size: var(--font-ui-small); color: var(--text-muted); }
+.lem-keychain-status, .lem-consumers-empty { font-size: var(--font-ui-small); color: var(--text-muted); padding: var(--size-4-3) calc(var(--size-4-4) + var(--size-2-2)); }
