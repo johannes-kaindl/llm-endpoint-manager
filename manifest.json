@@ -1,7 +1,7 @@
 {
   "id": "llm-endpoint-manager",
   "name": "LLM Endpoint Manager",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "minAppVersion": "1.11.4",
   "description": "One place for your LLM endpoints: URLs, models, capabilities and API tokens in the keychain — shared with other plugins through a small API.",
   "author": "Johannes Kaindl",

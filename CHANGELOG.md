@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.3] — 2026-09-26
+
 ### Fixed
 - The keychain status text and the empty-consumers text in the settings tab now sit inside their group box with the same inset as the rows below (they were flush with the box edge).
 
