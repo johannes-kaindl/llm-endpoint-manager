@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Documentation
+- README rewritten after the workspace standard (features, requirements, install, configuration, how it works), plus a German README.
+- User documentation under `docs/`: an index, a getting-started tutorial and a troubleshooting guide, linked from both READMEs.
+
 ## [0.2.2] — 2026-09-25
 
 ### Fixed
