@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { requestUrl } from "obsidian";
-import { makeFakeApp, Setting, TextComponent, ToggleComponent, DropdownComponent, ButtonComponent } from "./vendor/kit/obsidian-mock";
+import { makeFakeApp, Setting, TextComponent, ToggleComponent, DropdownComponent, ButtonComponent, ExtraButtonComponent } from "./vendor/kit/obsidian-mock";
 import LlmEndpointManagerPlugin from "../src/main";
-import { LlmEndpointManagerSettingTab } from "../src/obsidian/settings-tab";
+import { helpSettingDefinition } from "../src/vendor/kit-obsidian/help-setting";
+import { LlmEndpointManagerSettingTab, helpOptions } from "../src/obsidian/settings-tab";
 
 // Testumgebung ist "node" (kein jsdom, siehe vitest.config.ts) — die Endpunkt-Liste probt beim
 // Rendern jede Zeile über src/obsidian/http.ts, das window.setTimeout/clearTimeout braucht
@@ -50,6 +51,26 @@ describe("LlmEndpointManagerSettingTab", () => {
     const marked = inExtra.filter(s => s.settingEl.hasClass("lem-cap-row"));
     expect(marked.length).toBe(1);
     expect(marked[0]!.components.filter((c: unknown) => c instanceof ToggleComponent).length).toBe(4);
+  });
+  it("hat die Hilfe-Zeile als erstes Element, mit Doku-Index und Issues dieses Repos", async () => {
+    const { tab: t, el } = await tab({ endpoints: [] });
+    const first = t.getSettingDefinitions()[0] as unknown as { type?: string; name: string; render: (s: Setting) => void };
+    expect(first.type).toBeUndefined();   // keine Gruppe, keine Überschrift davor
+    expect(first.name).toBe("Help");
+    // Fallback-Pfad: die erste gezeichnete Zeile ist dieselbe, mit Text- und Icon-Knopf
+    const row = settingsIn(el)[0]!;
+    expect(row.nameValue).toBe("Help");
+    expect(row.components.some((c: unknown) => c instanceof ButtonComponent && c.textValue === "Open documentation")).toBe(true);
+    expect(row.components.some((c: unknown) => c instanceof ExtraButtonComponent && c.iconName === "bug")).toBe(true);
+    // beide Knöpfe öffnen die richtigen URLs
+    const opened: string[] = [];
+    const probe = new Setting(el as never);
+    helpSettingDefinition(helpOptions((u) => opened.push(u))).render!(probe as never, {} as never);
+    probe.components.forEach((c: ButtonComponent | ExtraButtonComponent) => c.clickCB?.());
+    expect(opened).toEqual([
+      "https://github.com/johannes-kaindl/llm-endpoint-manager/blob/main/docs/README.md",
+      "https://github.com/johannes-kaindl/llm-endpoint-manager/issues",
+    ]);
   });
   it("schaltet eine Fähigkeit und speichert", async () => {
     const { el, plugin } = await tab({ endpoints: [{ id: "e1", url: "http://a", capabilities: ["chat"] }] });

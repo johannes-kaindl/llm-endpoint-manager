@@ -542,6 +542,23 @@ async function main(): Promise<void> {
       JSON.stringify(extraLabels),
     );
 
+    // F1 — Hilfe-Zeile (UI-STANDARD §8) ist die ERSTE Setting-Zeile des Tabs, sichtbar, mit Text-Knopf und bug-Knopf.
+    const helpRow = await settings.cdp.evaluate<{ first: string; button: string; bug: boolean; visible: boolean }>(`
+      const it = ${settings.el(`root.querySelector(".setting-item")`)};
+      const r = it ? it.getBoundingClientRect() : { width: 0, height: 0 };
+      return {
+        first: it?.querySelector(".setting-item-name")?.textContent ?? "(keine Zeile)",
+        button: it?.querySelector("button")?.textContent ?? "",
+        bug: !!it?.querySelector(".extra-setting-button svg.lucide-bug, .clickable-icon svg.lucide-bug, svg.bug"),
+        visible: r.width > 0 && r.height > 0,
+      };
+    `);
+    record(
+      "F1 Hilfe-Zeile ist die erste Zeile, sichtbar, mit „Open documentation“ und bug-Knopf",
+      helpRow.first === "Help" && helpRow.button === "Open documentation" && helpRow.bug && helpRow.visible,
+      JSON.stringify(helpRow),
+    );
+
     // D2 — Familie fuer den Alias per Dropdown setzen, Settings neu laden, Wert bleibt.
     const familySetOk = await settings.cdp.evaluate<{ ok: boolean }>(`
       const row = Array.from(${settings.el(`root.querySelectorAll(".setting-item")`)}).find((r) => {

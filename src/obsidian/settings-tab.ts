@@ -2,6 +2,7 @@ import { App, Notice, PluginSettingTab, Setting, type SettingDefinitionItem } fr
 import type LlmEndpointManagerPlugin from "../main";
 import { t } from "../vendor/kit/i18n";
 import { renderSettingDefinitions, settingBodyHost, refreshSettingsTab } from "../vendor/kit-obsidian/settings_walker";
+import { githubHelpUrls, helpSettingDefinition, type HelpSettingOptions } from "../vendor/kit-obsidian/help-setting";
 import { buildEndpointList, type EndpointListStrings, type EndpointSecretHook } from "../vendor/kit-obsidian/endpoint-list";
 import { createModelListCache, type ModelListCache } from "../vendor/kit/model-list-cache";
 import type { EndpointStatusKind } from "../vendor/kit/endpoint_diagnostics";
@@ -25,6 +26,15 @@ const WARN_KEY: Record<string, string> = {
   "scheme": "ep.warn.scheme", "malformed": "ep.warn.malformed", "port": "ep.warn.port", "placeholder-ip": "ep.warn.placeholderIp",
 };
 
+/** Doku-Index und Issues auf GitHub (Repo-Name, nicht Plugin-ID); `open` nur für Tests. */
+export function helpOptions(open?: (url: string) => void): HelpSettingOptions {
+  return {
+    ...githubHelpUrls("llm-endpoint-manager"),
+    texts: { name: t("help.name"), desc: t("help.desc"), openDocs: t("help.openDocs"), reportIssue: t("help.reportIssue") },
+    ...(open ? { open } : {}),
+  };
+}
+
 export class LlmEndpointManagerSettingTab extends PluginSettingTab {
   private modelLists: ModelListCache = createModelListCache();
   private cleanupPrevious: () => void = () => {};
@@ -34,7 +44,9 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
   }
 
   getSettingDefinitions(): SettingDefinitionItem[] {
-    const defs: GroupDef[] = [
+    // Hilfe-Zeile (UI-STANDARD §8): immer das ERSTE Element, vor jeder Gruppe.
+    const defs: (GroupDef | ReturnType<typeof helpSettingDefinition>)[] = [
+      helpSettingDefinition(helpOptions()),
       { type: "group", heading: t("set.groupEndpoints"), items: [
         { name: t("set.endpoints"), desc: t("set.endpointsDesc"), render: (s) => { this.renderEndpoints(s); } },
       ] },

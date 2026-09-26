@@ -3,6 +3,10 @@ import { defineStrings } from "../vendor/kit/i18n";
 export const STRINGS = {
   en: {
     "plugin.name": "LLM Endpoint Manager",
+    "help.name": "Help",
+    "help.desc": "Getting started, how-tos and troubleshooting",
+    "help.openDocs": "Open documentation",
+    "help.reportIssue": "Report an issue",
     "set.groupEndpoints": "Endpoints",
     "set.endpoints": "LLM endpoints",
     "set.endpointsDesc": "An endpoint is the server address of a language model service (LM Studio, Ollama, a cloud API). Order matters: plugins use the first reachable one with the capability they need.",
@@ -80,6 +84,10 @@ export const STRINGS = {
   },
   de: {
     "plugin.name": "LLM Endpoint Manager",
+    "help.name": "Hilfe",
+    "help.desc": "Erste Schritte, Anleitungen und Fehlersuche",
+    "help.openDocs": "Dokumentation öffnen",
+    "help.reportIssue": "Problem melden",
     "set.groupEndpoints": "Endpunkte",
     "set.endpoints": "LLM-Endpunkte",
     "set.endpointsDesc": "Ein Endpunkt ist die Serveradresse eines Sprachmodell-Dienstes (LM Studio, Ollama, eine Cloud-API). Die Reihenfolge zählt: Plugins nehmen den ersten erreichbaren mit der Fähigkeit, die sie brauchen.",

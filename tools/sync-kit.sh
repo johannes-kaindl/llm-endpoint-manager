@@ -158,7 +158,7 @@ PURE_MODULE="endpoint endpoint_config endpoint_diagnostics model-choice model-li
 # Die gekoppelte Schicht (importiert `obsidian`). endpoint-list und model-picker tragen einen
 # Querimport auf ../vendor/code-kit/{pure,web}/ bzw. ../pure/ und brauchen deshalb den relayer
 # (Fallgruppe unten); secrets.ts importiert ../pure/secrets → ebenfalls relayer.
-OBSIDIAN_MODULE="confirm endpoint-list model-picker settings_walker folder-suggest secrets"
+OBSIDIAN_MODULE="confirm endpoint-list model-picker settings_walker folder-suggest secrets help-setting"
 
 # Die "vendored"-Zeile der VENDOR.json wird aus derselben Liste erzeugt, aus der kopiert wird.
 # Zwei Orte fuer dieselbe Wahrheit driften (CORE-META-16) — und zwar leise: die Datei, in der
