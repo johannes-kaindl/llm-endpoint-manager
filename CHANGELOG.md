@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.1] — 2026-09-26
+
 ### Changed
 - Kit modules updated from `obsidian-kit` 0.41.0 to 0.43.0 (full re-vendoring; apart from the endpoint list only the provenance stamps changed). The endpoint list's CSS now uses child selectors (`.okit-ep-row > …`), so the nested extra rows (label, protocol, capabilities, active) keep their labels without a local override. The two override rules in `styles.css` are removed; the endpoint rows look exactly as before, in wide and narrow settings windows.
 
