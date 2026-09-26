@@ -44,6 +44,13 @@ describe("LlmEndpointManagerSettingTab", () => {
     const labels = inExtra.flatMap(s => s.components.filter((c: unknown): c is TextComponent => c instanceof TextComponent));
     expect(labels[0]?.getValue()).toBe("a");
   });
+  it("markiert die Zeile mit den vier Fähigkeits-Schaltern mit lem-cap-row (statt :has in styles.css)", async () => {
+    const { el } = await tab({ endpoints: [{ id: "e1", url: "http://a", capabilities: ["chat"] }] });
+    const inExtra = settingsIn(el.querySelectorAll(".okit-ep-extra")[0]!);
+    const marked = inExtra.filter(s => s.settingEl.hasClass("lem-cap-row"));
+    expect(marked.length).toBe(1);
+    expect(marked[0]!.components.filter((c: unknown) => c instanceof ToggleComponent).length).toBe(4);
+  });
   it("schaltet eine Fähigkeit und speichert", async () => {
     const { el, plugin } = await tab({ endpoints: [{ id: "e1", url: "http://a", capabilities: ["chat"] }] });
     const inExtra = settingsIn(el.querySelectorAll(".okit-ep-extra")[0]!);

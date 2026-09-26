@@ -170,6 +170,8 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
       d.onChange((v) => { this.modelLists.invalidate(normalizeEndpoint(cfg.url)); void save((e) => { e.provider = v as Provider; }).then(() => this.refreshUi()); });
     });
     const caps = new Setting(host).setName(t("row.capabilities"));
+    // Eigene Klasse statt `:has(.lem-cap)` in styles.css (Store-Befund „Avoid :has“, 0.2.3).
+    caps.settingEl.addClass("lem-cap-row");
     for (const c of CAPABILITIES) {
       // Toggle und Beschriftung als eine Einheit, damit ein schmales Fenster sie nicht trennt
       // (das Label rutschte sonst als Einzelzeile unter den Toggle, s. Screenshot 2026-09-25).

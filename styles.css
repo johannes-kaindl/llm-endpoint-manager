@@ -83,8 +83,8 @@
 .okit-ep-extra .setting-item { flex-wrap: wrap; gap: var(--size-4-2); }
 /* Die Fähigkeiten-Beschriftung ist ein ganzer Satz — eigene Zeile über den vier Schaltern statt
    daneben gequetscht (schmales Fenster, Screenshot 2026-09-25). */
-.okit-ep-extra .setting-item:has(.lem-cap) .setting-item-info { flex: 1 1 100%; text-align: left; }
-.okit-ep-extra .setting-item:has(.lem-cap) .setting-item-control { flex-wrap: wrap; justify-content: flex-start; }
+.okit-ep-extra .setting-item.lem-cap-row .setting-item-info { flex: 1 1 100%; text-align: left; }
+.okit-ep-extra .setting-item.lem-cap-row .setting-item-control { flex-wrap: wrap; justify-content: flex-start; }
 .lem-row-warn { flex: 0 0 100%; font-size: var(--font-ui-small); color: var(--text-warning); }
 .lem-row-warn:empty { display: none; }
 
