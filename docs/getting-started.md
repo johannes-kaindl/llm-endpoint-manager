@@ -24,7 +24,7 @@ Click **Check connections** to test all rows again.
 
 Below the address, the row shows one of these roles:
 
-- **active** — this is the endpoint a plugin will get.
+- **reachable, position 1** — reachable and first in the list: this is the endpoint a plugin asking for one of its capabilities will get.
 - **reachable, position 2** — reachable, but an endpoint above it comes first. **Use first** moves a row to the top.
 - **not reachable** — plugins skip it.
 

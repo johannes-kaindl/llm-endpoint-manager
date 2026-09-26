@@ -6,10 +6,12 @@
 
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![Docs: CC BY-SA 4.0](https://img.shields.io/badge/docs-CC%20BY--SA%204.0-lightgrey.svg)](LICENSE-DOCS)
-[![Release](https://img.shields.io/gitea/v/release/jkaindl/llm-endpoint-manager?gitea_url=https%3A%2F%2Fgit.jkaindl.de&label=release)](https://git.jkaindl.de/jkaindl/llm-endpoint-manager/releases)
+[![Release](https://img.shields.io/github/v/release/johannes-kaindl/llm-endpoint-manager?label=release)](https://github.com/johannes-kaindl/llm-endpoint-manager/releases)
 ![Platform](https://img.shields.io/badge/platform-Obsidian%201.11.4%2B%20%C2%B7%20desktop%20%26%20mobile-7c3aed)
 
 If several plugins in your vault talk to language models, each one normally asks you for the same server address and the same API token. LLM Endpoint Manager is the one place where you enter them once. Tokens are never written to `data.json` — they live exclusively in Obsidian's keychain — and other plugins reach the endpoint list through a small API. It owns endpoints, tokens, model lists and reachability checks; it knows nothing about prompts, roles or requests, which stays with the plugins that consume the API.
+
+<img src="https://raw.githubusercontent.com/johannes-kaindl/llm-endpoint-manager/main/docs/images/hero.png" width="820" alt="The settings window of LLM Endpoint Manager: a list of endpoints with LM Studio at reachable position 1 and Ollama at position 2, each with a green status indicator, protocol, capability toggles and an Enabled switch">
 
 ## Features
 
@@ -19,6 +21,12 @@ If several plugins in your vault talk to language models, each one normally asks
 - **Model table** — per endpoint, every model the server reports plus the ones you already configured. Set a model's **family** (a suggestion is offered from the model name) and mark it as **another spelling of** a second model id, so plugins send the id you prefer.
 - **Backend detection** — "Detect" recognizes LM Studio, Ollama, Open WebUI or a plain OpenAI-compatible server with read-only requests; it never loads a model.
 - **See who uses it** — the settings tab lists which plugins asked for an endpoint during the current session, and for which capability.
+
+<img src="https://raw.githubusercontent.com/johannes-kaindl/llm-endpoint-manager/main/docs/images/endpoints.png" width="820" alt="The lower endpoint list: an Ollama row that is reachable at position 2, an Office server row with a red indicator, a saved token and the label not reachable, then the add field and the preset buttons LM Studio, Ollama, OpenAI-compatible cloud and Check connections">
+
+<img src="https://raw.githubusercontent.com/johannes-kaindl/llm-endpoint-manager/main/docs/images/models.png" width="820" alt="The Models group for an LM Studio endpoint: four models with family dropdowns, one suggested family, one model entered as another spelling of qwen/qwen3.8-27b, and the Backend row set to LM Studio with a Detect button">
+
+<img src="https://raw.githubusercontent.com/johannes-kaindl/llm-endpoint-manager/main/docs/images/consumers.png" width="820" alt="The API tokens and Plugins using these endpoints groups: the keychain status text and two calling plugins, Vault Search for embedding and Notes Assistant for chat, each with a time">
 
 ## Requirements
 
@@ -34,12 +42,12 @@ Install [AnySource Sideloader](https://git.jkaindl.de/jkaindl/anysource-sideload
 
 ### Manual
 
-Download `main.js`, `manifest.json` and `styles.css` from the [latest release](https://git.jkaindl.de/jkaindl/llm-endpoint-manager/releases), put them into `<vault>/.obsidian/plugins/llm-endpoint-manager/`, then enable **LLM Endpoint Manager** under **Settings → Community plugins**.
+Download `main.js`, `manifest.json` and `styles.css` from the [latest release](https://github.com/johannes-kaindl/llm-endpoint-manager/releases), put them into `<vault>/.obsidian/plugins/llm-endpoint-manager/`, then enable **LLM Endpoint Manager** under **Settings → Community plugins**.
 
 ### From source
 
 ```bash
-git clone https://git.jkaindl.de/jkaindl/llm-endpoint-manager
+git clone https://github.com/johannes-kaindl/llm-endpoint-manager
 cd llm-endpoint-manager && npm install && npm run build
 # copy main.js, manifest.json and styles.css into <vault>/.obsidian/plugins/llm-endpoint-manager/
 ```
@@ -51,7 +59,7 @@ The plugin has no commands and no ribbon icon; everything happens in **Settings 
 1. Under **Endpoints**, type an address into the field **Add an endpoint: http://localhost:1234** and click out of the field (rows are saved when a field loses focus) — or click a one-click preset button (**LM Studio**, **Ollama**, **OpenAI-compatible cloud**).
 2. Check the row's **Protocol** and **Capabilities**. A row without a capability is invisible to every plugin and shows a warning.
 3. Optional: paste an **API token (optional)** into the row. It goes into the keychain; the row then shows **token saved**.
-4. Read the status indicator on the row: **active** means this is the endpoint a plugin would get, **reachable, position 2** means a better one comes first. Use **Use first** to change the order.
+4. Read the status indicator on the row: **reachable, position 1** means this is the first choice for a plugin (given the capability it asks for), **reachable, position 2** means a better one comes first. Use **Use first** to change the order.
 5. Under **Models**, review the model list per endpoint, set a **Family** where the suggestion is wrong, and use **Detect** to fill in the **Backend**.
 
 ### Configuration

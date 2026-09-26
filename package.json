@@ -13,6 +13,8 @@
     "lint": "node scripts/check-no-inline-disables.mjs && eslint src --max-warnings 0",
     "check:pure": "node scripts/check-pure.mjs",
     "gate": "npm run lint && npm run typecheck && npm run typecheck:test && npm run typecheck:scripts && npm test && npm run check:pure && npm run build",
+    "shots:check": "D=\"${DOCS_ROOT:-$HOME/Projects/jkaindl/workspace/_docs}\"; test -f \"$D/readme/readme_lint.py\" || D=../../_docs; if test -f \"$D/readme/readme_lint.py\"; then python3 \"$D/readme/readme_lint.py\" .; else echo 'shots:check uebersprungen: readme_lint.py weder unter DOCS_ROOT bzw. ~/Projects/jkaindl/workspace/_docs noch unter ../../_docs (maintainer-lokal)'; fi",
+    "shots": "esbuild scripts/shots.ts --bundle --platform=node --format=esm --outfile=.shots.mjs --log-level=warning && node .shots.mjs",
     "smoke:gui": "esbuild scripts/gui-smoke.ts --bundle --platform=node --format=esm --outfile=.gui-smoke.mjs --log-level=warning && node .gui-smoke.mjs",
     "deploy": "npm run build && cp main.js manifest.json styles.css \"${OBSIDIAN_PLUGIN_DIR:?set OBSIDIAN_PLUGIN_DIR}\"/",
     "release": "test -f ../tools/release/release.mjs || { echo \"FEHLER: ../tools/release/ fehlt. Dieses Repo muss im Dach-Verzeichnis obsidian-plugins/ neben tools/ liegen.\" >&2; exit 1; }; node ../tools/release/release.mjs",

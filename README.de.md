@@ -6,10 +6,12 @@
 
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![Docs: CC BY-SA 4.0](https://img.shields.io/badge/docs-CC%20BY--SA%204.0-lightgrey.svg)](LICENSE-DOCS)
-[![Release](https://img.shields.io/gitea/v/release/jkaindl/llm-endpoint-manager?gitea_url=https%3A%2F%2Fgit.jkaindl.de&label=release)](https://git.jkaindl.de/jkaindl/llm-endpoint-manager/releases)
+[![Release](https://img.shields.io/github/v/release/johannes-kaindl/llm-endpoint-manager?label=release)](https://github.com/johannes-kaindl/llm-endpoint-manager/releases)
 ![Platform](https://img.shields.io/badge/platform-Obsidian%201.11.4%2B%20%C2%B7%20Desktop%20%26%20Mobil-7c3aed)
 
 Sprechen mehrere Plugins in deinem Vault mit Sprachmodellen, fragt normalerweise jedes nach derselben Serveradresse und demselben API-Token. LLM Endpoint Manager ist der eine Ort, an dem du beides nur einmal einträgst. Tokens landen nie in der `data.json` — sie liegen ausschließlich im Obsidian-Schlüsselbund —, und andere Plugins erreichen die Endpunkt-Liste über eine kleine API. Er besitzt Endpunkte, Tokens, Modell-Listen und Erreichbarkeits-Prüfungen; von Prompts, Rollen oder Anfragen weiß er nichts, das bleibt bei den Plugins, die die API nutzen.
+
+<img src="https://raw.githubusercontent.com/johannes-kaindl/llm-endpoint-manager/main/docs/images/hero.png" width="820" alt="Das Einstellungsfenster von LLM Endpoint Manager: eine Endpunkt-Liste mit LM Studio auf erreichbar Platz 1 und Ollama auf Platz 2, je mit grünem Status-Indikator, Protokoll, Fähigkeiten-Schaltern und Aktiv-Schalter">
 
 ## Features
 
@@ -19,6 +21,12 @@ Sprechen mehrere Plugins in deinem Vault mit Sprachmodellen, fragt normalerweise
 - **Modelltabelle** — je Endpunkt jedes Modell, das der Server meldet, plus die bereits konfigurierten. Setze die **Familie** eines Modells (aus dem Namen wird ein Vorschlag gemacht) und markiere es als **andere Schreibweise** einer zweiten Modell-ID, damit Plugins die ID senden, die du willst.
 - **Backend-Erkennung** — „Erkennen“ erkennt LM Studio, Ollama, Open WebUI oder einen schlichten OpenAI-kompatiblen Server mit rein lesenden Anfragen; es lädt nie ein Modell.
 - **Sehen, wer ihn nutzt** — der Einstellungs-Tab listet, welche Plugins in dieser Sitzung nach einem Endpunkt gefragt haben und für welche Fähigkeit.
+
+<img src="https://raw.githubusercontent.com/johannes-kaindl/llm-endpoint-manager/main/docs/images/endpoints.png" width="820" alt="Die untere Endpunkt-Liste: eine Ollama-Zeile, erreichbar auf Platz 2, eine Zeile Office server mit rotem Indikator, gespeichertem Token und dem Vermerk nicht erreichbar, darunter Hinzufüge-Feld und Preset-Knöpfe LM Studio, Ollama, OpenAI-compatible cloud und Check connections">
+
+<img src="https://raw.githubusercontent.com/johannes-kaindl/llm-endpoint-manager/main/docs/images/models.png" width="820" alt="Die Gruppe Models für einen LM-Studio-Endpunkt: vier Modelle mit Familien-Auswahl, ein Familien-Vorschlag, ein Modell als andere Schreibweise von qwen/qwen3.8-27b und die Backend-Zeile LM Studio mit Detect-Knopf">
+
+<img src="https://raw.githubusercontent.com/johannes-kaindl/llm-endpoint-manager/main/docs/images/consumers.png" width="820" alt="Die Gruppen API tokens und Plugins using these endpoints: der Schlüsselbund-Hinweis und zwei anfragende Plugins, Vault Search für Embedding und Notes Assistant für Chat, je mit Uhrzeit">
 
 ## Voraussetzungen
 
@@ -34,12 +42,12 @@ Sprechen mehrere Plugins in deinem Vault mit Sprachmodellen, fragt normalerweise
 
 ### Manuell
 
-`main.js`, `manifest.json` und `styles.css` aus dem [letzten Release](https://git.jkaindl.de/jkaindl/llm-endpoint-manager/releases) nach `<vault>/.obsidian/plugins/llm-endpoint-manager/` legen und **LLM Endpoint Manager** unter **Einstellungen → Community-Plugins** aktivieren.
+`main.js`, `manifest.json` und `styles.css` aus dem [letzten Release](https://github.com/johannes-kaindl/llm-endpoint-manager/releases) nach `<vault>/.obsidian/plugins/llm-endpoint-manager/` legen und **LLM Endpoint Manager** unter **Einstellungen → Community-Plugins** aktivieren.
 
 ### Aus dem Quellcode
 
 ```bash
-git clone https://git.jkaindl.de/jkaindl/llm-endpoint-manager
+git clone https://github.com/johannes-kaindl/llm-endpoint-manager
 cd llm-endpoint-manager && npm install && npm run build
 # main.js, manifest.json und styles.css nach <vault>/.obsidian/plugins/llm-endpoint-manager/ kopieren
 ```
@@ -51,7 +59,7 @@ Das Plugin hat weder Befehle noch ein Ribbon-Icon; alles passiert unter **Einste
 1. Unter **Endpunkte** eine Adresse in das Feld **Endpunkt hinzufügen: http://localhost:1234** tippen und aus dem Feld herausklicken (Zeilen werden gespeichert, sobald ein Feld den Fokus verliert) — oder einen Preset-Knopf klicken (**LM Studio**, **Ollama**, **OpenAI-compatible cloud**).
 2. **Protokoll** und **Fähigkeiten** der Zeile prüfen. Eine Zeile ohne Fähigkeit ist für jedes Plugin unsichtbar und zeigt eine Warnung.
 3. Optional: ein **API-Token (optional)** in die Zeile einfügen. Es geht in den Schlüsselbund; die Zeile zeigt dann **Token gespeichert**.
-4. Den Status-Indikator lesen: **aktiv** heißt, das ist der Endpunkt, den ein Plugin bekäme; **erreichbar, Platz 2** heißt, ein besserer steht davor. Mit **Zuerst verwenden** änderst du die Reihenfolge.
+4. Den Status-Indikator lesen: **erreichbar, Platz 1** heißt, das ist die erste Wahl für ein Plugin (bei der Fähigkeit, die es anfragt); **erreichbar, Platz 2** heißt, ein besserer steht davor. Mit **Zuerst verwenden** änderst du die Reihenfolge.
 5. Unter **Modelle** die Modell-Liste je Endpunkt prüfen, bei falschem Vorschlag die **Familie** setzen und mit **Erkennen** das **Backend** ausfüllen.
 
 ### Konfiguration
