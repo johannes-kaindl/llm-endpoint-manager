@@ -1,5 +1,5 @@
 {
-  "sources": { "obsidian-kit": { "ref": "0.43.0" }, "code-kit": { "ref": "0.7.0" } },
+  "sources": { "obsidian-kit": { "ref": "0.45.1" }, "code-kit": { "ref": "0.7.0" } },
   "targets": [
     { "dir": "src/vendor/kit", "source": "obsidian-kit", "from": "src/pure", "modules": ["secrets"] },
     {
@@ -12,7 +12,7 @@
     },
     {
       "dir": "src/vendor/kit-obsidian", "source": "obsidian-kit", "from": "src/obsidian",
-      "modules": ["confirm", "settings_walker", "folder-suggest", "help-setting"]
+      "modules": ["confirm", "settings_walker", "folder-suggest", "help-setting", "shortcuts-bridge", "clock"]
     },
     {
       "dir": "src/vendor/kit-obsidian", "source": "obsidian-kit", "from": "src/obsidian", "modules": ["secrets"],

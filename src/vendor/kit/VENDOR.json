@@ -1,7 +1,7 @@
 {
   "source": "obsidian-kit",
-  "version": "0.43.0",
-  "sha": "bcd1805",
+  "version": "0.45.1",
+  "sha": "325d3ff",
   "code_kit_version": "0.7.0",
   "vendored": "secrets.ts, endpoint-source.ts",
   "note": "Verbatim snapshot aus ZWEI Quellen (obsidian-kit + code-kit); welche Datei woher stammt, sagt ihr eigener Kopf. Never hand-edit. Pins in tools/kit-sync.json, re-vendor via tools/sync-kit.sh (zentrales kit-sync im Dach). version/sha gelten AUSSCHLIESSLICH fuer die unter \"vendored\" gelisteten Dateien. kit-obsidian/ siehe dortige VENDOR.json.",

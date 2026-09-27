@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.43.0, src/testing/obsidian-mock.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.45.1, src/testing/obsidian-mock.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 // Self-contained Obsidian test double for obsidian-kit.
 // - Zero external imports (NOT from "obsidian", NOT from "vitest").
 // - Consumed via vitest `resolve.alias` as a drop-in for `import ... from "obsidian"`,
@@ -418,6 +418,10 @@ export class Plugin {
   registerEvent(_evt: any): void {}
   registerDomEvent(..._args: any[]): void {}
   registerInterval(id: number): number { return id; }
+  __protocolHandlers: Record<string, (params: Record<string, string>) => void> = {};
+  registerObsidianProtocolHandler(action: string, handler: (params: Record<string, string>) => any): void {
+    this.__protocolHandlers[action] = handler;
+  }
 }
 
 export class PluginSettingTab {
