@@ -32,6 +32,30 @@ Each entry gives the message as it appears in the settings tab (English interfac
 
 These messages point at a typo and never block saving: **Address should start with http:// or https://** (a scheme is missing), **Address looks malformed** (the text is not a valid URL — also what the empty **OpenAI-compatible cloud** preset, which starts as just `https://`, shows until you complete it with your provider's address), **Port looks unusual** (a local `http://` address without a port such as `:1234`) and **Placeholder address — replace it** (`0.0.0.0` or an example address from the documentation ranges).
 
+## The Apple Intelligence (on-device) endpoint
+
+See [Set up the Apple shortcut](apple-shortcut.md) for the full setup. These are the **Run test prompt** failure reasons.
+
+### "Test failed (error): …"
+
+**Cause:** the shortcut itself reported a failure — often a guardrail rejection (the on-device model declined the prompt) or an action inside the shortcut that failed. **What to do:** read the message text; try a shorter or plainer test prompt; open the shortcut in the Shortcuts app and run it once by hand to see where it stops.
+
+### "Test failed (cancel): …"
+
+**Cause:** the app switch to Shortcuts was cancelled (for example by tapping away, or a system prompt was dismissed). **What to do:** run **Run test prompt** again and stay in Shortcuts until it returns to Obsidian.
+
+### "Test failed (timeout): …"
+
+**Cause:** no reply arrived within the configured **Timeout (seconds)** — most often the shortcut's name does not exactly match **Shortcut name**, so it never launches; less often a slow device or a long prompt. **What to do:** check the exact spelling of the shortcut name in the Shortcuts app; raise the timeout for long prompts.
+
+### "Test failed (busy): …"
+
+**Cause:** another shortcut run is still in flight — only one run is allowed at a time (the app switch cannot tell two runs apart). **What to do:** wait for the first run to finish (or its timeout to pass), then try again.
+
+### The plugin does not know whether Apple Intelligence is actually on
+
+**Cause:** the endpoint's reachability check only confirms the device is iOS or macOS — it cannot ask whether Apple Intelligence is enabled or which iOS/macOS version is running. **What to do:** use **Run test prompt** as the real check; if it fails with **error**, confirm in **Settings → Apple Intelligence & Siri** (iOS/macOS) that it is turned on and the device meets the requirements.
+
 ## Tokens and the keychain
 
 ### "Tokens need the Obsidian keychain (Obsidian 1.11.4 or newer, desktop and mobile). Endpoints without a token still work." / "Keychain not available — tokens cannot be stored."

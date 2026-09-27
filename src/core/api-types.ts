@@ -3,4 +3,5 @@
 export {
   LLM_ENDPOINT_MANAGER_API_VERSION, LLM_ENDPOINT_MANAGER_PLUGIN_ID,
   type ApiErrorCode, type ApiError, type ApiEndpoint, type ResolvedEndpoint, type ImportResult, type LlmEndpointManagerApi,
+  type ListFilter, type EndpointTransport, type ShortcutTransportConfig,
 } from "../vendor/kit/endpoint-source";

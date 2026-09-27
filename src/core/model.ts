@@ -1,16 +1,16 @@
 import { mergeSettings } from "../vendor/kit/settings";
 import type { EndpointConfig } from "../vendor/kit/endpoint_config";
 import { secretIdFor } from "../vendor/kit/secrets";
-import type { Provider, Capability, ApiModelInfo } from "../vendor/kit/endpoint-source";
+import type { Provider, Capability, ApiModelInfo, EndpointTransport, ShortcutTransportConfig } from "../vendor/kit/endpoint-source";
 import { BACKEND_IDS, FAMILY_IDS, type BackendId, type FamilyId } from "../vendor/kit/sampling-profiles";
 
-export type { Provider, Capability } from "../vendor/kit/endpoint-source";
+export type { Provider, Capability, EndpointTransport, ShortcutTransportConfig } from "../vendor/kit/endpoint-source";
 
 /** `as const satisfies` statt eines Laufzeit-Arrays über dem Typ: erweitert ein Re-Vendoring die
  *  `Provider`/`Capability`-Union der Kit-Quelle, bricht der Compiler HIER statt still einen
  *  unbekannten Wert in `normalizeEndpointEntry` auf "openai" herunterzustufen bzw. im
  *  Settings-Dropdown wegzulassen (Finding 3, Whole-Branch-Review). */
-export const PROVIDERS = ["openai", "ollama", "a1111", "comfy"] as const satisfies readonly Provider[];
+export const PROVIDERS = ["openai", "ollama", "a1111", "comfy", "apple-shortcuts"] as const satisfies readonly Provider[];
 export type _AlleProviderAbgedeckt = Exclude<Provider, (typeof PROVIDERS)[number]> extends never ? true : never;
 
 export const CAPABILITIES = ["chat", "embedding", "vision", "image"] as const satisfies readonly Capability[];
@@ -32,7 +32,21 @@ export interface ManagedEndpoint extends EndpointConfig {
   secretId?: string;
   backend?: BackendId;
   models?: ApiModelInfo[];
+  /** Additiv, Opt-in (Spec § Baustein 2): fehlt das Feld, ist der Endpunkt `"http"` wie bisher.
+   *  `shortcut` ist nur bei `transport: "shortcuts"` gesetzt. */
+  transport?: EndpointTransport;
+  shortcut?: ShortcutTransportConfig;
 }
+
+/** `url` ist bei `EndpointConfig` Pflicht, obwohl ein Kurzbefehl-Endpunkt kein HTTP-Ziel hat —
+ *  dieser Platzhalter macht die Normalisierung/Dedupe-Logik (`normalizeEndpoint`) stabil, ohne
+ *  dass irgendein Code ihn je als URL anfragt (`providerProbe("apple-shortcuts")` liefert `null`,
+ *  s. provider.ts). */
+export const APPLE_SHORTCUTS_URL = "apple-shortcuts://on-device";
+export const DEFAULT_SHORTCUT_NAME = "Ask On-Device Model (Obsidian)";
+/** Spike-Messung: 8–14 s Rundlauf bei > 8k Zeichen Payload (Spec § Kontext und Messgrundlage).
+ *  30 s Marge für Guardrail-Prüfung und langsamere Geräte. */
+export const DEFAULT_SHORTCUT_TIMEOUT_MS = 30_000;
 
 export interface ManagerSettings {
   version: 1;
@@ -88,6 +102,19 @@ function modelsOf(raw: unknown): ApiModelInfo[] | undefined {
   return out;
 }
 
+function transportOf(raw: unknown): EndpointTransport | undefined {
+  return raw === "http" || raw === "shortcuts" ? raw : undefined;
+}
+
+function shortcutOf(raw: unknown): ShortcutTransportConfig | undefined {
+  if (typeof raw !== "object" || raw === null) return undefined;
+  const o = raw as Record<string, unknown>;
+  const name = str(o.name);
+  const timeoutMs = typeof o.timeoutMs === "number" && Number.isFinite(o.timeoutMs) && o.timeoutMs > 0 ? o.timeoutMs : undefined;
+  if (!name || !timeoutMs) return undefined;
+  return { name, timeoutMs };
+}
+
 function capabilitiesOf(raw: unknown): Capability[] {
   if (!Array.isArray(raw)) return [];
   const out: Capability[] = [];
@@ -125,6 +152,10 @@ export function normalizeEndpointEntry(raw: unknown, mint: () => string): Manage
   if (backend) out.backend = backend;
   const models = modelsOf(r.models);
   if (models && models.length) out.models = models;
+  const transport = transportOf(r.transport);
+  if (transport) out.transport = transport;
+  const shortcut = shortcutOf(r.shortcut);
+  if (shortcut) out.shortcut = shortcut;
   return out;
 }
 

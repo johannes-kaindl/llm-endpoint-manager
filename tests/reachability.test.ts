@@ -3,8 +3,9 @@ import { createReachabilityCache, materialize, resolveFirst } from "../src/core/
 import type { ManagedEndpoint } from "../src/core/model";
 
 const ep = (o: Partial<ManagedEndpoint> & { url: string }): ManagedEndpoint => ({
-  id: o.id ?? o.url, label: o.url, url: o.url, provider: "openai", capabilities: o.capabilities ?? ["chat"],
+  id: o.id ?? o.url, label: o.url, url: o.url, provider: o.provider ?? "openai", capabilities: o.capabilities ?? ["chat"],
   enabled: o.enabled ?? true, ...(o.model ? { model: o.model } : {}), ...(o.secretId ? { secretId: o.secretId } : {}),
+  ...(o.transport ? { transport: o.transport } : {}),
 });
 
 describe("createReachabilityCache", () => {
@@ -62,5 +63,15 @@ describe("resolveFirst", () => {
     const list = [ep({ url: "http://a", secretId: "s" })];
     const r = await resolveFirst(list, "chat", createReachabilityCache(() => 0), () => Promise.resolve(true), () => null);
     expect(r).toEqual({ error: "no-endpoint" });
+  });
+  it("überspringt IMMER transport:shortcuts — resolve() kennt kein Opt-in (Default fest http)", async () => {
+    const list = [
+      ep({ url: "apple-shortcuts://on-device", provider: "apple-shortcuts", transport: "shortcuts" }),
+      ep({ url: "http://ok" }),
+    ];
+    const probe = vi.fn((m: { config: { url: string } }) => Promise.resolve(true));
+    const r = await resolveFirst(list, "chat", createReachabilityCache(() => 0), probe, () => null);
+    expect((r as { ep: ManagedEndpoint }).ep.url).toBe("http://ok");
+    expect(probe.mock.calls.map(c => c[0].config.url)).toEqual(["http://ok"]);
   });
 });

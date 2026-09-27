@@ -1,9 +1,18 @@
 import { normalizeEndpoint } from "../vendor/kit/endpoint";
 import type { EndpointConfig } from "../vendor/kit/endpoint_config";
-import { labelFromUrl, secretIdOf, type Capability, type ManagedEndpoint } from "./model";
+import { labelFromUrl, secretIdOf, type Capability, type EndpointTransport, type ManagedEndpoint } from "./model";
 
 export function byCapability(eps: ManagedEndpoint[], cap?: Capability): ManagedEndpoint[] {
   return cap ? eps.filter((e) => e.capabilities.includes(cap)) : [...eps];
+}
+
+/** Opt-in-Filter (Spec § Baustein 2): Default `["http"]` — ein Aufrufer, der `transports` nicht
+ *  ausdrücklich nennt, sieht nie einen Apple-Endpunkt (dessen `url` ist kein HTTP-Ziel; alte
+ *  Vendor-Kopien der Konsumenten würden sonst ins Leere feuern). Ein Endpunkt ohne `transport`
+ *  gilt als `"http"`. */
+export function byTransport(eps: ManagedEndpoint[], transports?: EndpointTransport[]): ManagedEndpoint[] {
+  const wanted = transports ?? ["http"];
+  return eps.filter((e) => wanted.includes(e.transport ?? "http"));
 }
 
 export interface ImportResult { added: string[]; merged: string[]; skipped: string[] }

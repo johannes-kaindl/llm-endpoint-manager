@@ -1,10 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { byCapability, importEndpoints } from "../src/core/list-ops";
+import { byCapability, byTransport, importEndpoints } from "../src/core/list-ops";
 import type { ManagedEndpoint } from "../src/core/model";
 
 const ep = (o: Partial<ManagedEndpoint> & { url: string }): ManagedEndpoint => ({
   id: o.id ?? o.url, label: o.label ?? o.url, url: o.url, provider: o.provider ?? "openai",
   capabilities: o.capabilities ?? ["chat"], enabled: o.enabled ?? true, ...(o.model ? { model: o.model } : {}), ...(o.secretId ? { secretId: o.secretId } : {}),
+  ...(o.transport ? { transport: o.transport } : {}),
 });
 const mint = (() => { let n = 0; return () => `n${++n}`; })();
 
@@ -13,6 +14,19 @@ describe("byCapability", () => {
     const list = [ep({ url: "a", capabilities: ["chat"] }), ep({ url: "b", capabilities: ["embedding", "chat"] })];
     expect(byCapability(list, "embedding").map(e => e.url)).toEqual(["b"]);
     expect(byCapability(list).map(e => e.url)).toEqual(["a", "b"]);
+  });
+});
+
+describe("byTransport", () => {
+  it("Default ist http-only — ein Apple-Endpunkt bleibt ohne Opt-in unsichtbar", () => {
+    const list = [ep({ url: "a" }), ep({ url: "apple-shortcuts://on-device", transport: "shortcuts" })];
+    expect(byTransport(list).map(e => e.url)).toEqual(["a"]);
+    expect(byTransport(list, undefined).map(e => e.url)).toEqual(["a"]);
+  });
+  it("Opt-in liefert beide bzw. gezielt nur shortcuts", () => {
+    const list = [ep({ url: "a" }), ep({ url: "apple-shortcuts://on-device", transport: "shortcuts" })];
+    expect(byTransport(list, ["http", "shortcuts"]).map(e => e.url)).toEqual(["a", "apple-shortcuts://on-device"]);
+    expect(byTransport(list, ["shortcuts"]).map(e => e.url)).toEqual(["apple-shortcuts://on-device"]);
   });
 });
 

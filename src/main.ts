@@ -4,9 +4,10 @@ import { pickLang, setLang, t } from "./vendor/kit/i18n";
 import { MemorySecretStore, type SecretStore } from "./vendor/kit/secrets";
 import { obsidianSecretStore, secretStorageAvailable } from "./vendor/kit-obsidian/secrets";
 import { createManagerApi, type ManagerApiHandle } from "./core/api";
-import type { LlmEndpointManagerApi } from "./core/api-types";
+import { LLM_ENDPOINT_MANAGER_PLUGIN_ID, type LlmEndpointManagerApi } from "./core/api-types";
 import { loadSettings, newId, secretIdOf, toPersisted, type ManagedEndpoint, type ManagerSettings } from "./core/model";
 import { listModels, probeReachable } from "./obsidian/http";
+import { createShortcutsBridge, type ShortcutsBridge } from "./vendor/kit-obsidian/shortcuts-bridge";
 import { LlmEndpointManagerSettingTab } from "./obsidian/settings-tab";
 
 function safeGetLanguage(): string | null {
@@ -19,10 +20,14 @@ export default class LlmEndpointManagerPlugin extends Plugin {
   keychain = false;
   handle!: ManagerApiHandle;
   api!: LlmEndpointManagerApi;
+  shortcutsBridge!: ShortcutsBridge;
 
   async onload(): Promise<void> {
     setLang(pickLang(safeGetLanguage()));
     this.settings = loadSettings(await this.loadData());
+    // Konvention der Brücke (Spec § Baustein 1): `<plugin-id>-shortcut`, einmal je Plugin
+    // registriert — der Probelauf-Knopf im Settings-Tab ist der einzige Aufrufer.
+    this.shortcutsBridge = createShortcutsBridge(this, { protocolAction: `${LLM_ENDPOINT_MANAGER_PLUGIN_ID}-shortcut` });
     this.keychain = secretStorageAvailable(this.app);
     this.secrets = this.keychain ? obsidianSecretStore(this.app) : new MemorySecretStore();
     this.handle = createManagerApi({

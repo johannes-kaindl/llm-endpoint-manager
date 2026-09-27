@@ -620,6 +620,44 @@ async function main(): Promise<void> {
       detectOk && backendDetected !== null,
       `Klick=${detectOk}, backend=${backendDetected !== null ? "lmstudio" : "nicht gesetzt"}`,
     );
+
+    // --- G1-G2: Provider apple-shortcuts (Welle 13, Spec § Baustein 2) --------------------
+    console.log("\nG · Provider apple-shortcuts");
+
+    // G1 — Preset "Apple Intelligence (on-device)" anlegen: Zeile traegt provider/transport/
+    // shortcut, KEIN HTTP-Ziel als URL (Sentinel apple-shortcuts://on-device).
+    const applePresetOk = await clickReal(settings.cdp, settings.el(
+      `Array.from(root.querySelectorAll("button")).find((b) => b.textContent.trim() === "Apple Intelligence (on-device)")`,
+    ));
+    const appleRowAppeared = await pollUntil<{ ok: boolean }>(cdp, `
+      const p = app.plugins.plugins[${q(PLUGIN_ID)}];
+      return p.settings.endpoints.some((e) => e.provider === "apple-shortcuts") ? { ok: true } : null;
+    `, 8000, 300);
+    const appleEp = await cdp.evaluate<{ url: string; provider: string; transport: string; shortcut: { name: string; timeoutMs: number } } | null>(`
+      const e = app.plugins.plugins[${q(PLUGIN_ID)}].settings.endpoints.find((x) => x.provider === "apple-shortcuts");
+      return e ? { url: e.url, provider: e.provider, transport: e.transport, shortcut: e.shortcut } : null;
+    `);
+    record(
+      "G1 Preset Apple Intelligence (on-device) → Zeile mit transport=shortcuts, Kurzbefehl-Name, KEIN HTTP-Ziel",
+      applePresetOk && appleRowAppeared !== null && appleEp?.transport === "shortcuts" && !appleEp.url.startsWith("http") && typeof appleEp.shortcut?.name === "string" && appleEp.shortcut.name.length > 0,
+      `Klick=${applePresetOk}, Zeile=${JSON.stringify(appleEp)}`,
+    );
+
+    // G2 — Filter-Default: ein Konsument ohne transports-Opt-in sieht den Apple-Endpunkt NIE
+    // (Spec § Baustein 2) — weder in list() noch als resolve()-Treffer; erst der ausdrueckliche
+    // Opt-in liefert ihn.
+    const filterRes = await cdp.evaluate<{ defaultIds: string[]; optInIds: string[]; resolveProvider: string | null }>(`
+      const api = app.plugins.plugins[${q(PLUGIN_ID)}].api;
+      const defaultIds = api.list({ capability: "chat" }).map((e) => e.provider);
+      const optInIds = api.list({ capability: "chat", transports: ["shortcuts"] }).map((e) => e.provider);
+      const r = await api.resolve("chat");
+      return { defaultIds, optInIds, resolveProvider: r && r.id ? (api.get(r.id)?.provider ?? null) : null };
+    `);
+    record(
+      "G2 Filter-Default: list() ohne transports-Opt-in zeigt apple-shortcuts NICHT, list({transports:[\"shortcuts\"]}) UND resolve() bleibt bei http",
+      !filterRes.defaultIds.includes("apple-shortcuts") && filterRes.optInIds.includes("apple-shortcuts") && filterRes.resolveProvider !== "apple-shortcuts",
+      JSON.stringify(filterRes),
+    );
   } finally {
     // B haengt seinen Fake-Endpunkt am Ende NICHT selbst aus — ohne diese Zeile hinterlaesst
     // schon ein regulaer DURCHGELAUFENER Lauf einen Rest in settings.endpoints, den C2 des

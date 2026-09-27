@@ -9,6 +9,12 @@ All notable changes to this project are documented here. The format follows
 ### Added
 
 - The GitHub release now also carries a ready-to-unpack `llm-endpoint-manager.zip` (the plugin folder with `main.js`, `manifest.json` and `styles.css`) and a `checksums.sha256` file. For a manual install, download the zip and unpack it into `.obsidian/plugins/` instead of creating the folder and saving three files by hand.
+- New endpoint type "Apple Intelligence (on-device)": a preset that runs chat through the Shortcuts app instead of a server address (iOS and macOS, no network, no cloud). Add it from the endpoint list's preset row, set the shortcut's exact name and a timeout, and use the new "Run test prompt" button to confirm the round trip on your device. The plugin API stays at version 1: existing consumers never see this endpoint unless they explicitly ask for it (`list({ transports: ["shortcuts"] })`); `resolve()` continues to pick only HTTP endpoints, unaware consumers are unaffected. See the new how-to "Set up the Apple shortcut" for setup.
+- Kit modules updated from `obsidian-kit` 0.43.0 to 0.45.1 (full re-vendoring; adds `shortcuts-bridge` and `clock`, and the extended `endpoint-source` with `EndpointTransport`/`ShortcutTransportConfig`/`ListFilter.transports`).
+
+### Known limitations
+
+- Apple Intelligence via Shortcuts: no streaming (one-shot reply), a ~4096-token context (input and output combined, per Apple's published limit), no sampling parameters, no tool calls, and no image input. The plugin cannot verify Apple Intelligence itself is enabled or that iOS/macOS 26+ is running — reachability is a device-family check only; use the test-prompt button for a real confirmation.
 
 ## [0.3.1] — 2026-09-26
 

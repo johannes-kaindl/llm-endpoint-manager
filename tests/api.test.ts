@@ -117,6 +117,33 @@ describe("createManagerApi", () => {
   });
 });
 
+describe("list() transports-Opt-in (apple-shortcuts, Spec § Baustein 2)", () => {
+  const withApple = () => loadSettings({ endpoints: [
+    { id: "a", label: "A", url: "http://a", capabilities: ["chat"] },
+    { id: "s", label: "Apple", url: "apple-shortcuts://on-device", provider: "apple-shortcuts", capabilities: ["chat"], transport: "shortcuts", shortcut: { name: "Ask On-Device Model (Obsidian)", timeoutMs: 30000 } },
+  ] });
+  it("Default (kein transports-Feld) zeigt nur http — der Apple-Endpunkt bleibt unsichtbar", () => {
+    const { d } = deps(withApple());
+    const { api } = createManagerApi(d);
+    expect(api.list().map((e) => e.id)).toEqual(["a"]);
+  });
+  it("Opt-in transports:[\"shortcuts\"] liefert den Apple-Endpunkt inkl. transport/shortcut", () => {
+    const { d } = deps(withApple());
+    const { api } = createManagerApi(d);
+    const r = api.list({ transports: ["shortcuts"] });
+    expect(r.map((e) => e.id)).toEqual(["s"]);
+    expect(r[0]).toMatchObject({ transport: "shortcuts", shortcut: { name: "Ask On-Device Model (Obsidian)", timeoutMs: 30000 } });
+  });
+  it("resolve() (kein Opt-in-Parameter) findet den Apple-Endpunkt NIE — nur materialize(id) mit bekannter ID", async () => {
+    const { d } = deps(withApple());
+    const { api } = createManagerApi(d);
+    const r = await api.resolve("chat");
+    expect((r as { id: string }).id).toBe("a");   // http zuerst in Listenreihenfolge, Apple wird uebersprungen
+    const m = await api.materialize("s");
+    expect(m).toMatchObject({ id: "s", transport: "shortcuts" });
+  });
+});
+
 describe("api-types Re-Export", () => {
   it("LLM_ENDPOINT_MANAGER_API_VERSION kommt aus dem gevendorten Kit-Modul — eine Quelle", () => {
     expect(LLM_ENDPOINT_MANAGER_API_VERSION).toBe(1);

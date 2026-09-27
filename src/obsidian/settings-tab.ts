@@ -1,4 +1,4 @@
-import { App, Notice, PluginSettingTab, Setting, type SettingDefinitionItem } from "obsidian";
+import { App, Notice, PluginSettingTab, Setting, type ButtonComponent, type SettingDefinitionItem } from "obsidian";
 import type LlmEndpointManagerPlugin from "../main";
 import { t } from "../vendor/kit/i18n";
 import { renderSettingDefinitions, settingBodyHost, refreshSettingsTab } from "../vendor/kit-obsidian/settings_walker";
@@ -10,7 +10,7 @@ import { authHeaders, type EndpointRole } from "../vendor/kit/endpoint_config";
 import { normalizeEndpoint } from "../vendor/kit/endpoint";
 import { BACKEND_IDS, BACKENDS, FAMILIES, FAMILY_IDS, type BackendId, type FamilyId } from "../vendor/kit/sampling-profiles";
 import { probeBaseUrl, probeEndpoint } from "../vendor/kit/capabilities";
-import { CAPABILITIES, PROVIDERS, labelFromUrl, newId, type ManagedEndpoint, type Provider } from "../core/model";
+import { CAPABILITIES, PROVIDERS, DEFAULT_SHORTCUT_NAME, DEFAULT_SHORTCUT_TIMEOUT_MS, labelFromUrl, newId, type ManagedEndpoint, type Provider } from "../core/model";
 import { modelRows, setModelMeta, type ModelRow } from "../core/model-rows";
 import { PRESETS } from "../core/provider";
 import { clientFor, capabilityFetch } from "./http";
@@ -128,8 +128,11 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
     return eps.map((e) => {
       if (e.id) return e;
       const preset = PRESETS.find((p) => normalizeEndpoint(p.url) === normalizeEndpoint(e.url));
-      return { ...e, id: newId(), label: e.label || labelFromUrl(e.url) || preset?.label || t("row.newEndpoint"), provider: preset?.provider ?? "openai",
+      const out: ManagedEndpoint = { ...e, id: newId(), label: e.label || labelFromUrl(e.url) || preset?.label || t("row.newEndpoint"), provider: preset?.provider ?? "openai",
         capabilities: preset ? [...preset.capabilities] : ["chat"], enabled: true };
+      if (preset?.transport) out.transport = preset.transport;
+      if (preset?.shortcut) out.shortcut = { ...preset.shortcut };
+      return out;
     });
   }
 
@@ -204,10 +207,56 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
       tg.toggleEl.setAttribute("aria-label", t("row.enabled"));
       tg.onChange((on) => { void save((e) => { e.enabled = on; }); });
     });
+    if (cfg.provider === "apple-shortcuts") this.renderAppleShortcut(host, cfg, save);
     const warn = host.createDiv({ cls: "lem-row-warn" });
     warn.setAttribute("data-for", cfg.id);
     this.syncCapWarning(host, cfg.id);
     if (cfg.secretId && !this.plugin.secrets.has(cfg.secretId)) host.createDiv({ cls: "lem-row-warn", text: t("row.secretMissing") });
+  }
+
+  /** Kurzbefehl-Name, Timeout und der Probelauf-Knopf (Spec § Baustein 2) — Johannes' iPhone-
+   *  Abnahme-Vehikel für den LLM-Weg. Nur für `provider === "apple-shortcuts"` gerendert; die
+   *  URL-/Token-Zeile des Kit-Editors bleibt sichtbar, ist für diesen Provider aber bedeutungslos
+   *  (kein HTTP-Ziel) — die Notiz weist das aus, statt es stillschweigend stehen zu lassen. */
+  private renderAppleShortcut(host: HTMLElement, cfg: ManagedEndpoint, save: (mutate: (e: ManagedEndpoint) => void) => Promise<void>): void {
+    host.createDiv({ cls: "lem-row-note", text: t("ep.appleDesc") });
+    new Setting(host).setName(t("ep.appleShortcutName")).setDesc(t("ep.appleShortcutNameDesc")).addText((tx) => {
+      tx.setValue(cfg.shortcut?.name ?? DEFAULT_SHORTCUT_NAME);
+      tx.inputEl.setAttribute("aria-label", t("ep.appleShortcutName"));
+      tx.inputEl.addEventListener("blur", () => {
+        const name = tx.getValue().trim() || DEFAULT_SHORTCUT_NAME;
+        void save((e) => { e.shortcut = { name, timeoutMs: e.shortcut?.timeoutMs ?? DEFAULT_SHORTCUT_TIMEOUT_MS }; });
+      });
+    });
+    new Setting(host).setName(t("ep.appleTimeout")).addText((tx) => {
+      tx.setValue(String(Math.round((cfg.shortcut?.timeoutMs ?? DEFAULT_SHORTCUT_TIMEOUT_MS) / 1000)));
+      tx.inputEl.type = "number";
+      tx.inputEl.setAttribute("aria-label", t("ep.appleTimeout"));
+      tx.inputEl.addEventListener("blur", () => {
+        const seconds = Number(tx.getValue());
+        const timeoutMs = Number.isFinite(seconds) && seconds > 0 ? Math.round(seconds * 1000) : DEFAULT_SHORTCUT_TIMEOUT_MS;
+        void save((e) => { e.shortcut = { name: e.shortcut?.name ?? DEFAULT_SHORTCUT_NAME, timeoutMs }; });
+      });
+    });
+    new Setting(host).setName(t("ep.appleProbe")).setDesc(t("ep.appleProbeDesc")).addButton((btn) => {
+      btn.setButtonText(t("ep.appleProbe"));
+      btn.buttonEl.setAttribute("aria-label", t("ep.appleProbe"));
+      btn.onClick(() => { void this.runAppleProbe(cfg, btn); });
+    });
+  }
+
+  private async runAppleProbe(cfg: ManagedEndpoint, btn: ButtonComponent): Promise<void> {
+    const shortcut = cfg.shortcut ?? { name: DEFAULT_SHORTCUT_NAME, timeoutMs: DEFAULT_SHORTCUT_TIMEOUT_MS };
+    btn.setDisabled(true);
+    btn.setButtonText(t("ep.appleProbeRunning"));
+    try {
+      const r = await this.plugin.shortcutsBridge.run({ shortcut: shortcut.name, input: t("ep.appleProbePrompt"), timeoutMs: shortcut.timeoutMs });
+      if (r.ok) new Notice(t("ep.appleProbeOk", r.result.slice(0, 200)), 10000);
+      else new Notice(t("ep.appleProbeFailed", r.reason, r.message), 10000);
+    } finally {
+      btn.setDisabled(false);
+      btn.setButtonText(t("ep.appleProbe"));
+    }
   }
 
   private syncCapWarning(host: HTMLElement, id: string): void {
@@ -227,6 +276,11 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
     const host = settingBodyHost(setting);
     for (const ep of this.plugin.settings.endpoints) {
       new Setting(host).setName(ep.label).setHeading();
+      // apple-shortcuts hat weder eine Sampling-Familie (FamilyId ist an code-kits
+      // Request-Tuning-Vertrag gekoppelt, den dieser Provider nicht bedient — keine
+      // Sampling-Parameter, kein HTTP-Backend) noch eine per HTTP erkennbare Backend-Software.
+      // Beschreibung als fester Text statt der beiden Blöcke (Befund an den Master, 2026-09-27).
+      if (ep.provider === "apple-shortcuts") { host.createDiv({ cls: "lem-row-note", text: t("ep.appleModelDesc") }); continue; }
       this.renderModels(host, ep);
       this.renderBackend(host, ep);
     }

@@ -3,6 +3,7 @@ import type { SecretStore } from "../vendor/kit/secrets";
 import type { EndpointConfig } from "../vendor/kit/endpoint_config";
 import { normalizeEndpoint } from "../vendor/kit/endpoint";
 import { LLM_ENDPOINT_MANAGER_API_VERSION, type ApiEndpoint, type ApiError, type ImportResult, type LlmEndpointManagerApi, type ResolvedEndpoint } from "./api-types";
+import { byTransport } from "./list-ops";
 import { byCapability, importEndpoints } from "./list-ops";
 import { toPersisted, type Capability, type ManagedEndpoint, type ManagerSettings, type Provider } from "./model";
 import { createReachabilityCache, materialize, resolveFirst, type Materialized, type ReachabilityCache } from "./reachability";
@@ -38,6 +39,8 @@ function toApiEndpoint(e: ManagedEndpoint, secrets: SecretStore): ApiEndpoint {
   if (e.model) out.defaultModel = e.model;
   if (e.backend) out.backend = e.backend;
   if (e.models) out.models = e.models;
+  if (e.transport) out.transport = e.transport;
+  if (e.shortcut) out.shortcut = e.shortcut;
   return out;
 }
 
@@ -46,6 +49,8 @@ function toResolved(m: Materialized): ResolvedEndpoint {
   if (m.ep.model) out.defaultModel = m.ep.model;
   if (m.ep.backend) out.backend = m.ep.backend;
   if (m.ep.models) out.models = m.ep.models;
+  if (m.ep.transport) out.transport = m.ep.transport;
+  if (m.ep.shortcut) out.shortcut = m.ep.shortcut;
   return out;
 }
 
@@ -66,7 +71,7 @@ export function createManagerApi(deps: ApiDeps): ManagerApiHandle {
 
   const api: LlmEndpointManagerApi = {
     version: LLM_ENDPOINT_MANAGER_API_VERSION,
-    list(filter) { return byCapability(deps.settings().endpoints, filter?.capability).map((e) => toApiEndpoint(e, deps.secrets)); },
+    list(filter) { return byTransport(byCapability(deps.settings().endpoints, filter?.capability), filter?.transports).map((e) => toApiEndpoint(e, deps.secrets)); },
     get(id) { const e = find(id); return e ? toApiEndpoint(e, deps.secrets) : null; },
     async resolve(capability, opts) {
       record(opts?.caller, capability);

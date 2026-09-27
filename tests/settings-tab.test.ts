@@ -157,4 +157,50 @@ describe("LlmEndpointManagerSettingTab", () => {
     expect(complete([{ url: "http://localhost:1234" }])[0]?.label).toBe("localhost:1234");   // mit Host bleibt es der Host
     expect(complete([{ url: "kaputt://" }])[0]?.label).toBe("New endpoint");   // kein Preset, kein Host → Platzhalter (en im Mock)
   });
+  it("uebernimmt transport/shortcut aus dem Apple-Preset beim Vervollstaendigen", async () => {
+    const { tab: t } = await tab({});
+    const complete = (t as unknown as { complete: (e: { url: string; label?: string }[]) => { transport?: string; shortcut?: { name: string; timeoutMs: number } }[] }).complete.bind(t);
+    const [e] = complete([{ url: "apple-shortcuts://on-device" }]);
+    expect(e?.transport).toBe("shortcuts");
+    expect(e?.shortcut).toEqual({ name: "Ask On-Device Model (Obsidian)", timeoutMs: 30000 });
+  });
+  it("zeigt Kurzbefehl-Name, Timeout und Probelauf-Knopf nur fuer apple-shortcuts-Zeilen", async () => {
+    const { el } = await tab({ endpoints: [
+      { id: "e1", url: "http://a", capabilities: ["chat"] },
+      { id: "e2", url: "apple-shortcuts://on-device", provider: "apple-shortcuts", capabilities: ["chat"], transport: "shortcuts", shortcut: { name: "My Shortcut", timeoutMs: 20000 } },
+    ] });
+    const extras = el.querySelectorAll(".okit-ep-extra");
+    expect(extras.length).toBe(2);
+    const inHttp = settingsIn(extras[0]!);
+    expect(inHttp.some((s) => s.components.some((c) => c instanceof TextComponent && (c as TextComponent).getValue() === "My Shortcut"))).toBe(false);
+    const inApple = settingsIn(extras[1]!);
+    const nameField = inApple.flatMap((s) => s.components).find((c): c is TextComponent => c instanceof TextComponent && c.getValue() === "My Shortcut");
+    expect(nameField).toBeDefined();
+    const timeoutField = inApple.flatMap((s) => s.components).find((c): c is TextComponent => c instanceof TextComponent && c.getValue() === "20");
+    expect(timeoutField).toBeDefined();
+    const probeBtn = inApple.flatMap((s) => s.components).find((c): c is ButtonComponent => c instanceof ButtonComponent && c.textValue === "Run test prompt");
+    expect(probeBtn).toBeDefined();
+  });
+  it("Probelauf-Knopf ruft die Shortcuts-Bridge mit Kurzbefehl-Name/Timeout und meldet die Antwort per Notice", async () => {
+    const { el, plugin } = await tab({ endpoints: [
+      { id: "e2", url: "apple-shortcuts://on-device", provider: "apple-shortcuts", capabilities: ["chat"], transport: "shortcuts", shortcut: { name: "My Shortcut", timeoutMs: 20000 } },
+    ] });
+    const runCalls: unknown[] = [];
+    (plugin as unknown as { shortcutsBridge: { run: (req: unknown) => Promise<unknown> } }).shortcutsBridge = {
+      run: (req: unknown) => { runCalls.push(req); return Promise.resolve({ ok: true, result: "funktioniert", durationMs: 5 }); },
+    };
+    const extras = el.querySelectorAll(".okit-ep-extra");
+    const probeBtn = settingsIn(extras[0]!).flatMap((s) => s.components).find((c): c is ButtonComponent => c instanceof ButtonComponent && c.textValue === "Run test prompt")!;
+    probeBtn.clickCB!();
+    await new Promise((r) => setTimeout(r, 10));
+    expect(runCalls).toEqual([{ shortcut: "My Shortcut", input: expect.any(String), timeoutMs: 20000 }]);
+  });
+  it("zeigt festen Beschreibungstext statt Familie/Backend-Bloecken fuer apple-shortcuts", async () => {
+    const { el } = await tab({ endpoints: [
+      { id: "e2", label: "Apple", url: "apple-shortcuts://on-device", provider: "apple-shortcuts", capabilities: ["chat"] },
+    ] });
+    expect(el.textContent).toContain("Apple Intelligence (on-device) — fixed model");
+    const settings = el.querySelectorAll(".setting-item").map((n) => n.__setting!).filter(Boolean);
+    expect(settings.some((s) => s.components.some((c) => c instanceof DropdownComponent && Object.keys((c as DropdownComponent).options).includes("gpt-oss")))).toBe(false);
+  });
 });

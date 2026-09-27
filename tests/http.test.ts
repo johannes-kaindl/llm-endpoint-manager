@@ -66,6 +66,13 @@ describe("probeStatus/listModels", () => {
     expect((await probeStatus({ url: "http://h" }, "openai", 100)).reachable).toBe(false);
     expect(await listModels({ url: "http://h" }, "openai", 100)).toEqual([]);
   });
+  it("apple-shortcuts: reiner Plattform-Check, NIE ein Netzwerk-Aufruf (Spec § Baustein 2)", async () => {
+    const st = await probeStatus({ url: "apple-shortcuts://on-device" }, "apple-shortcuts", 100);
+    expect(st.reachable).toBe(true);   // obsidian-mock: Platform.isMacOS = true
+    expect(rq.mock.calls.length).toBe(0);
+    expect(await listModels({ url: "apple-shortcuts://on-device" }, "apple-shortcuts", 100)).toEqual([]);
+    expect(rq.mock.calls.length).toBe(0);
+  });
   it("a1111/comfy-klartext bei 2xx ist an classifyEndpointStatus['ok'] gebunden, kein freistehendes Literal", async () => {
     // http.ts kann KLARTEXT nicht importieren (privates const in endpoint_diagnostics.ts) und
     // traegt den Text deshalb als eigenes Literal — dieser Test verriegelt beide Werte gegeneinander,

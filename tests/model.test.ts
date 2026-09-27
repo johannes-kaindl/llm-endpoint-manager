@@ -75,3 +75,30 @@ describe("models and backend", () => {
     expect(s.endpoints[0]!.models).toEqual([{ id: "m" }]);
   });
 });
+
+describe("transport und shortcut (apple-shortcuts)", () => {
+  it("uebernimmt transport und shortcut bei gueltigen Werten", () => {
+    const e = normalizeEndpointEntry(
+      { url: "apple-shortcuts://on-device", provider: "apple-shortcuts", transport: "shortcuts", shortcut: { name: "Ask On-Device Model (Obsidian)", timeoutMs: 30000 } },
+      () => "x",
+    );
+    expect(e?.transport).toBe("shortcuts");
+    expect(e?.shortcut).toEqual({ name: "Ask On-Device Model (Obsidian)", timeoutMs: 30000 });
+  });
+  it("verwirft unbekannten transport und unvollstaendigen shortcut", () => {
+    const e1 = normalizeEndpointEntry({ url: "http://a", transport: "carrier-pigeon" }, () => "x");
+    expect(e1?.transport).toBeUndefined();
+    const e2 = normalizeEndpointEntry({ url: "http://a", shortcut: { name: "X" } }, () => "x");
+    expect(e2?.shortcut).toBeUndefined();
+    const e3 = normalizeEndpointEntry({ url: "http://a", shortcut: { timeoutMs: 1000 } }, () => "x");
+    expect(e3?.shortcut).toBeUndefined();
+  });
+  it("toPersisted behaelt transport/shortcut", () => {
+    const s = loadSettings({ endpoints: [{
+      id: "e1", url: "apple-shortcuts://on-device", provider: "apple-shortcuts", capabilities: ["chat"],
+      transport: "shortcuts", shortcut: { name: "Ask On-Device Model (Obsidian)", timeoutMs: 30000 },
+    }] });
+    expect(toPersisted(s).endpoints[0]!.transport).toBe("shortcuts");
+    expect(toPersisted(s).endpoints[0]!.shortcut).toEqual({ name: "Ask On-Device Model (Obsidian)", timeoutMs: 30000 });
+  });
+});

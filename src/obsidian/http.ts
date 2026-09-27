@@ -1,5 +1,5 @@
 // uebernommen aus lingotuner/src/obsidian/http.ts (probeEndpoint/listModels/clientFor), 2026-09-13 — Abweichung: Pfad und Modell-Extraktion je Provider
-import { requestUrl } from "obsidian";
+import { Platform, requestUrl } from "obsidian";
 import { classifyEndpointStatus, type EndpointStatus } from "../vendor/kit/endpoint_diagnostics";
 import { normalizeEndpoint } from "../vendor/kit/endpoint";
 import { authHeaders, type EndpointConfig } from "../vendor/kit/endpoint_config";
@@ -43,15 +43,30 @@ export const capabilityFetch: CapabilityFetch = async (req) => {
   try { return { json: JSON.parse(res.text) }; } catch { return null; }
 };
 
-function target(cfg: EndpointConfig, provider: Provider): string {
-  return `${normalizeEndpoint(cfg.url)}${providerProbe(provider).path}`;
+function target(cfg: EndpointConfig, provider: Provider, probe: ReturnType<typeof providerProbe>): string {
+  return `${normalizeEndpoint(cfg.url)}${probe?.path ?? ""}`;
+}
+
+/** `apple-shortcuts` hat keinen HTTP-Pfad (Spec § Baustein 2): Erreichbarkeit ist ein reiner
+ *  Plattform-Check, kein Netzwerk-Aufruf. Apple Intelligence selbst (aktiviert? Modell geladen?)
+ *  kann das Plugin von hier aus nicht prüfen — dafür ist der Probelauf-Knopf mit Mini-Prompt da
+ *  (settings-tab.ts), der echte Rundlauf bleibt Gerätemessung. `isMacOS`/`isIosApp` prüfen nur die
+ *  Geräteart, keine OS-Version — Obsidian exponiert 26+ nicht; das ist eine bekannte Grenze
+ *  (Doku nennt sie), keine Falschmeldung. */
+export function applePlatformStatus(): EndpointStatus {
+  const supported = Platform.isIosApp || Platform.isMacOS;
+  return supported
+    ? { reachable: true, kind: "ok", klartext: "Gerät unterstützt Kurzbefehle (iOS/macOS) — Apple Intelligence selbst ungeprüft." }
+    : { reachable: false, kind: "unknown", klartext: "", raw: "Kurzbefehle gibt es nur auf iOS und macOS." };
 }
 
 /** Erreichbarkeit MIT Token — ohne meldet ein gehosteter Anbieter 401 und gilt still als tot.
  *  Für a1111/comfy zählt nur „antwortet mit 2xx"; `classifyEndpointStatus` würde deren Antwort
  *  als not-an-llm-api werten, was hier keine Aussage ist. */
 export async function probeStatus(cfg: EndpointConfig, provider: Provider, timeoutMs: number = PROBE_TIMEOUT_MS): Promise<EndpointStatus> {
-  const res = await send(target(cfg, provider), timeoutMs, authHeaders(cfg.apiKey));
+  if (provider === "apple-shortcuts") return applePlatformStatus();
+  const probe = providerProbe(provider);
+  const res = await send(target(cfg, provider, probe), timeoutMs, authHeaders(cfg.apiKey));
   if (res.timedOut) return classifyEndpointStatus({ kind: "timeout" });
   if (res.error !== null) return classifyEndpointStatus({ kind: "error", message: res.error });
   if (provider === "a1111" || provider === "comfy") {
@@ -69,10 +84,16 @@ export function probeReachable(cfg: EndpointConfig, provider: Provider): Promise
   return probeStatus(cfg, provider).then((s) => s.reachable);
 }
 
+/** `apple-shortcuts` hat keine Modell-Liste zum Abfragen — die (einzige) Modellbeschreibung
+ *  kommt vorbevölkert über den Preset (`ep.models`, Spec § Baustein 2), `modelRows()` zeigt sie
+ *  auch ohne Live-Discovery an (src/core/model-rows.ts). */
 export async function listModels(cfg: EndpointConfig, provider: Provider, timeoutMs: number = PROBE_TIMEOUT_MS): Promise<string[]> {
-  const res = await send(target(cfg, provider), timeoutMs, authHeaders(cfg.apiKey));
+  if (provider === "apple-shortcuts") return [];
+  const probe = providerProbe(provider);
+  if (!probe) return [];
+  const res = await send(target(cfg, provider, probe), timeoutMs, authHeaders(cfg.apiKey));
   if (res.timedOut || res.error !== null || res.status < 200 || res.status >= 300) return [];
-  try { return providerProbe(provider).models(JSON.parse(res.text)); } catch { return []; }
+  try { return probe.models(JSON.parse(res.text)); } catch { return []; }
 }
 
 /** EIN Client je Zeile für den Kit-Listen-Editor (Status-Icon UND Modell-Liste). */

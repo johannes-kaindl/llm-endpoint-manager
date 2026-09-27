@@ -49,6 +49,11 @@ export function materialize(ep: ManagedEndpoint, token: (secretId: string) => st
 
 /** Erster erreichbarer, aktivierter Eintrag mit der Fähigkeit, in Listenreihenfolge. Einträge mit
  *  fehlendem Token werden still übersprungen (kein Fehler — der Manager zeigt sie im Tab an). */
+/** `resolve()` des öffentlichen Vertrags kennt kein `transports`-Opt-in (anders als `list()`) —
+ *  ein unbedarfter Konsument, der einfach „das erste erreichbare" will, darf NIE einen
+ *  Apple-Endpunkt bekommen (dessen `config.url` ist kein HTTP-Ziel). Default ist deshalb hier
+ *  fest `"http"`, nicht konfigurierbar: ein Konsument, der einen Shortcuts-Endpunkt bewusst will,
+ *  holt ihn über `list({transports:["shortcuts"]})` + `materialize(id)` mit expliziter ID. */
 export async function resolveFirst(
   eps: ManagedEndpoint[],
   cap: Capability,
@@ -57,7 +62,7 @@ export async function resolveFirst(
   token: (secretId: string) => string | null,
 ): Promise<Materialized | { error: "no-endpoint" }> {
   for (const ep of eps) {
-    if (!ep.enabled || !ep.capabilities.includes(cap)) continue;
+    if (!ep.enabled || !ep.capabilities.includes(cap) || ep.transport === "shortcuts") continue;
     const m = materialize(ep, token);
     if ("error" in m) continue;
     let reachable = cache.get(ep.url);
