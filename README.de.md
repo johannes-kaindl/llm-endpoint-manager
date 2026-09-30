@@ -38,7 +38,7 @@ Sprechen mehrere Plugins in deinem Vault mit Sprachmodellen, fragt normalerweise
 
 ### Plugin-Katalog (empfohlen)
 
-[AnySource Sideloader](https://git.jkaindl.de/jkaindl/anysource-sideloader) installieren, den Katalog `https://git.jkaindl.de/jkaindl/obsidian-catalog/raw/branch/main/catalog.json` hinzufügen, dort **LLM Endpoint Manager** installieren und unter **Einstellungen → Community-Plugins** aktivieren.
+[AnySource Sideloader](https://git.jkaindl.de/jkaindl/anysource-sideloader) installieren, den Katalog `https://git.jkaindl.de/jkaindl/obsidian-catalog/raw/branch/main/catalog.json` hinzufügen, dort **LLM Endpoint Manager** installieren und unter **Einstellungen → Community-Plugins** aktivieren. Oder lade `llm-endpoint-manager.zip` aus dem Release — es enthält genau diese Dateien — und entpacke es nach `.obsidian/plugins/`; mit `checksums.sha256` prüfst du den Download.
 
 ### Manuell
 

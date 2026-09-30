@@ -38,7 +38,7 @@ If several plugins in your vault talk to language models, each one normally asks
 
 ### Plugin catalog (recommended)
 
-Install [AnySource Sideloader](https://git.jkaindl.de/jkaindl/anysource-sideloader), add the catalog `https://git.jkaindl.de/jkaindl/obsidian-catalog/raw/branch/main/catalog.json`, then install **LLM Endpoint Manager** from it and enable it under **Settings → Community plugins**.
+Install [AnySource Sideloader](https://git.jkaindl.de/jkaindl/anysource-sideloader), add the catalog `https://git.jkaindl.de/jkaindl/obsidian-catalog/raw/branch/main/catalog.json`, then install **LLM Endpoint Manager** from it and enable it under **Settings → Community plugins**. Or download `llm-endpoint-manager.zip` from the release — it contains exactly these files — and unpack it into `.obsidian/plugins/`; `checksums.sha256` lets you verify the download.
 
 ### Manual
 
