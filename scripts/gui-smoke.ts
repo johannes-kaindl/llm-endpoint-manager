@@ -627,7 +627,7 @@ async function main(): Promise<void> {
     // G1 — Preset "Apple Intelligence (on-device)" anlegen: Zeile traegt provider/transport/
     // shortcut, KEIN HTTP-Ziel als URL (Sentinel apple-shortcuts://on-device).
     const applePresetOk = await clickReal(settings.cdp, settings.el(
-      `Array.from(root.querySelectorAll("button")).find((b) => b.textContent.trim() === "Apple Intelligence (on-device)")`,
+      `Array.from(root.querySelectorAll("button")).find((b) => ["Apple Intelligence (on-device)", "Apple Intelligence (auf dem Gerät)"].includes(b.textContent.trim()))`,
     ));
     const appleRowAppeared = await pollUntil<{ ok: boolean }>(cdp, `
       const p = app.plugins.plugins[${q(PLUGIN_ID)}];

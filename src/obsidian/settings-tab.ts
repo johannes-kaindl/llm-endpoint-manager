@@ -26,6 +26,13 @@ const WARN_KEY: Record<string, string> = {
   "scheme": "ep.warn.scheme", "malformed": "ep.warn.malformed", "port": "ep.warn.port", "placeholder-ip": "ep.warn.placeholderIp",
 };
 
+/** Anzeigename eines Presets in der gewählten Sprache: der Kit-Editor reicht nur `{label, url}` durch, die
+ *  Übersetzung hängt deshalb am kanonischen `label` (Marken ohne `labelKey` bleiben stehen). */
+export function presetText(p: { label: string }): string {
+  const key = PRESETS.find((x) => x.label === p.label)?.labelKey;
+  return key ? t(key) : p.label;
+}
+
 /** Doku-Index und Issues auf GitHub (Repo-Name, nicht Plugin-ID); `open` nur für Tests. */
 export function helpOptions(open?: (url: string) => void): HelpSettingOptions {
   return {
@@ -98,7 +105,7 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
         : role.kind === "standby" ? t("ep.role.standby", String(role.position))
         : role.kind === "unreachable" ? t("ep.role.unreachable") : t("ep.role.skippedModel"),
       warnings: (ws) => ws.map((w) => (WARN_KEY[w.rule] ? t(WARN_KEY[w.rule]) : w.message)).join(" · "),
-      presetTooltip: (p) => t("ep.preset", p.label), presetLabel: (p) => p.label,
+      presetTooltip: (p) => t("ep.preset", presetText(p)), presetLabel: (p) => presetText(p),
       checkConnection: t("ep.checkConnection"), saveFailed: t("ep.saveFailed"),
       secretSaved: t("ep.secretSaved"), secretChange: t("ep.secretChange"), secretClear: t("ep.secretClear"), secretUnavailable: t("ep.secretUnavailable"),
     };
@@ -315,7 +322,7 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
     });
     setting.addText((tx) => {
       tx.setValue(row.aliasOf ?? "");
-      tx.setPlaceholder(t("models.aliasOf"));
+      tx.setPlaceholder(t("models.aliasOfPlaceholder"));
       tx.inputEl.setAttribute("aria-label", t("models.aliasOfDesc"));
       tx.inputEl.addEventListener("blur", () => { void save({ aliasOf: tx.getValue().trim() || null }); });
     });

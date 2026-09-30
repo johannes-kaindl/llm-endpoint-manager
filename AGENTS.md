@@ -48,7 +48,7 @@ tests/vendor/kit/     vendorter Obsidian-Mock (obsidian-mock.ts)
 
 ## Commands
 
-- `npm run gate` — lint + typecheck + typecheck:test + test + check:pure + build; Pflicht vor
+- `npm run gate` — lint + typecheck + typecheck:test + typecheck:scripts + test + check:pure + build; Pflicht vor
   jedem Commit.
 - `npm run deploy` — Build + Kopie nach `$OBSIDIAN_PLUGIN_DIR` (Staging-Vault-Plugin-Ordner).
 - `KIT_REF=<version> CODE_KIT_REF=<version> sh tools/sync-kit.sh` — Re-Vendoring aus

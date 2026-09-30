@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- The preset buttons under the endpoint list no longer stay English in a German interface: "OpenAI-compatible cloud" now reads "OpenAI-kompatible Cloud" and "Apple Intelligence (on-device)" reads "Apple Intelligence (auf dem Gerät)" (brand names such as LM Studio and Ollama stay as they are). The tooltip "Add …" follows the same wording.
+- The empty "Other spelling of" field in the model table no longer shows a truncated label as its placeholder; it now says "Model id" / "Modell-ID", the full explanation stays in the field's accessible label.
+
 ## [0.4.0] — 2026-09-30
 
 ### Added

@@ -3,7 +3,8 @@ import { requestUrl } from "obsidian";
 import { makeFakeApp, Setting, TextComponent, ToggleComponent, DropdownComponent, ButtonComponent, ExtraButtonComponent } from "./vendor/kit/obsidian-mock";
 import LlmEndpointManagerPlugin from "../src/main";
 import { helpSettingDefinition } from "../src/vendor/kit-obsidian/help-setting";
-import { LlmEndpointManagerSettingTab, helpOptions } from "../src/obsidian/settings-tab";
+import { LlmEndpointManagerSettingTab, helpOptions, presetText } from "../src/obsidian/settings-tab";
+import { setLang } from "../src/vendor/kit/i18n";
 
 // Testumgebung ist "node" (kein jsdom, siehe vitest.config.ts) — die Endpunkt-Liste probt beim
 // Rendern jede Zeile über src/obsidian/http.ts, das window.setTimeout/clearTimeout braucht
@@ -31,6 +32,19 @@ async function tab(data: unknown, app = makeFakeApp()): Promise<{ tab: LlmEndpoi
   return { tab: t, el: t.containerEl as unknown as FakeEl, plugin: p };
 }
 const settingsIn = (el: FakeEl): Setting[] => el.querySelectorAll(".setting-item").map(e => e.__setting).filter((s): s is Setting => !!s);
+
+describe("presetText", () => {
+  it("uebersetzt Presets mit Schluessel und laesst Marken stehen, in beiden Sprachen", async () => {
+    await tab({ endpoints: [] });   // onload registriert die Strings
+    setLang("de");
+    expect(presetText({ label: "OpenAI-compatible cloud" })).toBe("OpenAI-kompatible Cloud");
+    expect(presetText({ label: "Apple Intelligence (on-device)" })).toBe("Apple Intelligence (auf dem Gerät)");
+    expect(presetText({ label: "LM Studio" })).toBe("LM Studio");
+    setLang("en");
+    expect(presetText({ label: "OpenAI-compatible cloud" })).toBe("OpenAI-compatible cloud");
+    expect(presetText({ label: "Apple Intelligence (on-device)" })).toBe("Apple Intelligence (on-device)");
+  });
+});
 
 describe("LlmEndpointManagerSettingTab", () => {
   it("zeichnet je Endpunkt eine Zusatzzeile mit Label, Protokoll, vier Fähigkeiten und Aktiv-Schalter", async () => {

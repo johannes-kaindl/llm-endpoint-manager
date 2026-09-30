@@ -8,6 +8,10 @@ describe("STRINGS", () => {
     const enDict: Record<string, string> = STRINGS.en; const deDict: Record<string, string> = STRINGS.de;
     for (const k of en) { expect(enDict[k]).toBeTruthy(); expect(deDict[k]).toBeTruthy(); }
   });
+  it("models.aliasOfPlaceholder ist kurz genug fuer das schmale Feld (Platzhalter ≠ Beschriftung)", () => {
+    expect(STRINGS.en["models.aliasOfPlaceholder"]!.length).toBeLessThanOrEqual(14);
+    expect(STRINGS.de["models.aliasOfPlaceholder"]!.length).toBeLessThanOrEqual(14);
+  });
   it("kein Fachbegriff ohne Auflösung: 'Endpoint' wird beim ersten Vorkommen erklärt", () => {
     expect(STRINGS.en["set.endpointsDesc"]).toMatch(/server address/i);
     expect(STRINGS.de["set.endpointsDesc"]).toMatch(/Serveradresse/);

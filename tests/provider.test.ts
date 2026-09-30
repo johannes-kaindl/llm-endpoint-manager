@@ -27,6 +27,14 @@ describe("providerProbe", () => {
       ["Apple Intelligence (on-device)", "apple-shortcuts", ["chat"]],
     ]);
   });
+  it("Presets mit eigener Bezeichnung tragen einen i18n-Schluessel (Marken wie LM Studio und Ollama nicht)", () => {
+    expect(PRESETS.map(p => [p.label, p.labelKey])).toEqual([
+      ["LM Studio", undefined],
+      ["Ollama", undefined],
+      ["OpenAI-compatible cloud", "preset.cloud"],
+      ["Apple Intelligence (on-device)", "preset.apple"],
+    ]);
+  });
   it("Apple-Preset traegt transport/shortcut und die feste Sentinel-URL", () => {
     const preset = PRESETS.find((p) => p.provider === "apple-shortcuts");
     expect(preset?.url).toBe(APPLE_SHORTCUTS_URL);

@@ -32,7 +32,9 @@ export function providerProbe(p: Provider): ProviderProbe | null {
 }
 
 export interface ProviderPreset {
+  /** Kanonische (englische) Bezeichnung; die Oberfläche zeigt sie über `labelKey`, sofern gesetzt. Marken (LM Studio, Ollama) tragen keinen Schlüssel. */
   label: string;
+  labelKey?: string;
   url: string;
   provider: Provider;
   capabilities: Capability[];
@@ -43,9 +45,9 @@ export interface ProviderPreset {
 export const PRESETS: readonly ProviderPreset[] = [
   { label: "LM Studio", url: "http://localhost:1234", provider: "openai", capabilities: ["chat", "vision", "embedding"] },
   { label: "Ollama", url: "http://localhost:11434", provider: "ollama", capabilities: ["chat", "embedding"] },
-  { label: "OpenAI-compatible cloud", url: "https://", provider: "openai", capabilities: ["chat"] },
+  { label: "OpenAI-compatible cloud", labelKey: "preset.cloud", url: "https://", provider: "openai", capabilities: ["chat"] },
   {
-    label: "Apple Intelligence (on-device)", url: APPLE_SHORTCUTS_URL, provider: "apple-shortcuts", capabilities: ["chat"],
+    label: "Apple Intelligence (on-device)", labelKey: "preset.apple", url: APPLE_SHORTCUTS_URL, provider: "apple-shortcuts", capabilities: ["chat"],
     transport: "shortcuts", shortcut: { name: DEFAULT_SHORTCUT_NAME, timeoutMs: DEFAULT_SHORTCUT_TIMEOUT_MS },
   },
 ];
