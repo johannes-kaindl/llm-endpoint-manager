@@ -1,4 +1,4 @@
-// vendored from code-kit@0.7.0, src/ts/pure/reasoning.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from code-kit@0.9.0, src/ts/pure/reasoning.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 export type ThinkingSupport = "none" | "hybrid" | "always";
 
 /** Legacy union params for switching reasoning off; empty object when not suppressing.

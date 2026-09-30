@@ -1,4 +1,4 @@
-// vendored from code-kit@0.7.0, src/ts/pure/sampling-profiles.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from code-kit@0.9.0, src/ts/pure/sampling-profiles.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 /** Request profiles for local and hosted LLM backends: which sampling values, which
  *  reasoning_effort and which minimum token budget a plugin sends, per model family × mode,
  *  and which of those fields a backend actually honours.
@@ -171,6 +171,29 @@ const FAMILY_PATTERNS: readonly [RegExp, FamilyId][] = [
   [/gemma[-_]?4/i, "gemma4"],
   [/gpt-oss/i, "gpt-oss"],
 ];
+
+/** Model family as SHOWN (label, origin), decoupled from the tuning key. `FamilyId` keys
+ *  `FAMILIES` and demands a full sampling profile per entry; a model without sampling
+ *  parameters (Apple Intelligence via Shortcuts) has none. `sampling` names the tuning family
+ *  the model maps to, or `null` when sampling does not apply. `apple-fm` never enters
+ *  `FAMILY_IDS`. Context size, streaming, tool calls and vision stay with the endpoint manager
+ *  (`Capability`), not here. */
+export const MODEL_FAMILY_IDS = [...FAMILY_IDS, "apple-fm"] as const;
+export type ModelFamilyId = (typeof MODEL_FAMILY_IDS)[number];
+export interface ModelFamilyInfo { label: string; sampling: FamilyId | null }
+
+export const MODEL_FAMILIES: Record<ModelFamilyId, ModelFamilyInfo> = {
+  "qwen3.8": { label: FAMILIES["qwen3.8"].label, sampling: "qwen3.8" },
+  "qwen3.6": { label: FAMILIES["qwen3.6"].label, sampling: "qwen3.6" },
+  "gemma4": { label: FAMILIES["gemma4"].label, sampling: "gemma4" },
+  "gpt-oss": { label: FAMILIES["gpt-oss"].label, sampling: "gpt-oss" },
+  "apple-fm": { label: "Apple Foundation Models", sampling: null },
+};
+
+/** The sampling-profile family for a display family, or `null` (no sampling parameters). */
+export function samplingFamilyOf(id: ModelFamilyId): FamilyId | null {
+  return MODEL_FAMILIES[id]?.sampling ?? null;
+}
 
 /** Best guess from a model id. Aliases such as `verdigado-pro` return null on purpose:
  *  the family of an alias is configured in llm-endpoint-manager, not guessed. */

@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.45.1, src/obsidian/shortcuts-bridge.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.46.0, src/obsidian/shortcuts-bridge.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 /** Die einzige Brücke von einem Obsidian-Plugin zu Apples on-device-Fähigkeiten (LLM, STT, OCR,
  *  TTS, Bildgenerierung) über Kurzbefehle — auf iOS gibt es keinen anderen Weg (JS-only,
  *  Codesigning, Nachbar-App-Server werden suspendiert). One-shot, kein Streaming, sichtbarer
@@ -8,7 +8,9 @@
  *  Extraktion aus dem Spike (`fm-spike/src/main.ts`, 2026-09-27, Messwerte in
  *  `FM-Spike Messungen.md`), verallgemeinert: EIN Besitzer je Fähigkeit verbaut die Brücke einmal
  *  (Spec § Leitentscheidung) — Konsumenten fragen den Besitzer über dessen Anbieter-API, nie
- *  direkt über diese Datei.
+ *  direkt über diese Datei. Ausnahme LLM-Weg (Entscheidung 2026-09-30): der Manager-Vertrag
+ *  exponiert keine Brücke, dort baut der Konsument eine eigene Instanz (`protocolAction` =
+ *  `<manifest.id>-shortcut`).
  *
  *  **Sicherheitsgrenze (Spike-Befund):** `obsidian://<action>` ist von jeder App/Webseite
  *  aufrufbar, nicht nur von der eigenen Brücke — deshalb die Correlation-ID: ein Callback ohne

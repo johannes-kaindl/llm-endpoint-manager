@@ -1,10 +1,10 @@
 {
   "source": "obsidian-kit",
-  "version": "0.45.1",
-  "sha": "325d3ff",
-  "code_kit_version": "0.7.0",
+  "version": "0.46.0",
+  "sha": "886bea5",
+  "code_kit_version": "0.9.0",
   "vendored": "secrets.ts, endpoint-source.ts",
   "note": "Verbatim snapshot aus ZWEI Quellen (obsidian-kit + code-kit); welche Datei woher stammt, sagt ihr eigener Kopf. Never hand-edit. Pins in tools/kit-sync.json, re-vendor via tools/sync-kit.sh (zentrales kit-sync im Dach). version/sha gelten AUSSCHLIESSLICH fuer die unter \"vendored\" gelisteten Dateien. kit-obsidian/ siehe dortige VENDOR.json.",
-  "code_kit_sha": "f999dd4",
+  "code_kit_sha": "dd17974",
   "code_kit_vendored": "endpoint.ts, endpoint_config.ts, endpoint_diagnostics.ts, model-choice.ts, model-list-cache.ts, timeout.ts, i18n.ts, settings.ts, reasoning.ts, capabilities.ts, sampling-profiles.ts"
 }
