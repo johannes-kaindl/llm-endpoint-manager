@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-09-30
+
 ### Added
 
 - The Apple Intelligence (on-device) preset now carries its one model row (`apple-fm`, display family "Apple Foundation Models"), and the model table draws that block from this data instead of a fixed paragraph; the limits text (4096-token context, no streaming, no sampling parameters, no tool calls, no vision input) stays underneath as a supplement. Consumers see the model with `displayFamily: "apple-fm"` through `list()`/`get()` (additive, plugin API stays at version 1). Kit: `obsidian-kit` 0.46.0, `code-kit` 0.9.0.
