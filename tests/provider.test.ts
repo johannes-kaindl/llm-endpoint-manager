@@ -35,6 +35,11 @@ describe("providerProbe", () => {
       ["Apple Intelligence (on-device)", "preset.apple"],
     ]);
   });
+  it("Apple-Preset traegt die eine Modellzeile mit Anzeige-Familie apple-fm (ohne Sampling-Familie)", () => {
+    const preset = PRESETS.find((p) => p.provider === "apple-shortcuts");
+    expect(preset?.models).toEqual([{ id: "apple-fm", displayFamily: "apple-fm" }]);
+    expect(PRESETS.filter((p) => p.provider !== "apple-shortcuts").every((p) => p.models === undefined)).toBe(true);
+  });
   it("Apple-Preset traegt transport/shortcut und die feste Sentinel-URL", () => {
     const preset = PRESETS.find((p) => p.provider === "apple-shortcuts");
     expect(preset?.url).toBe(APPLE_SHORTCUTS_URL);

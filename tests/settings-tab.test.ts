@@ -178,6 +178,20 @@ describe("LlmEndpointManagerSettingTab", () => {
     expect(e?.transport).toBe("shortcuts");
     expect(e?.shortcut).toEqual({ name: "Ask On-Device Model (Obsidian)", timeoutMs: 30000 });
   });
+  it("uebernimmt die Modellzeile (displayFamily apple-fm) aus dem Apple-Preset beim Vervollstaendigen", async () => {
+    const { tab: t } = await tab({});
+    const complete = (t as unknown as { complete: (e: { url: string }[]) => { models?: unknown[] }[] }).complete.bind(t);
+    expect(complete([{ url: "apple-shortcuts://on-device" }])[0]?.models).toEqual([{ id: "apple-fm", displayFamily: "apple-fm" }]);
+  });
+  it("zeichnet den Apple-Modellblock aus den Kit-Daten (Familien-Bezeichnung) und haengt den Grenzen-Text an", async () => {
+    const { el } = await tab({ endpoints: [
+      { id: "e2", label: "Apple", url: "apple-shortcuts://on-device", provider: "apple-shortcuts", capabilities: ["chat"], transport: "shortcuts",
+        shortcut: { name: "Ask On-Device Model (Obsidian)", timeoutMs: 30000 }, models: [{ id: "apple-fm", displayFamily: "apple-fm" }] },
+    ] });
+    const row = settingsIn(el).find((s) => s.nameValue === "apple-fm");
+    expect(row?.descValue).toBe("Apple Foundation Models");
+    expect(el.textContent).toContain("4096-token context");   // Grenzen-Text bleibt als Ergänzung
+  });
   it("zeigt Kurzbefehl-Name, Timeout und Probelauf-Knopf nur fuer apple-shortcuts-Zeilen", async () => {
     const { el } = await tab({ endpoints: [
       { id: "e1", url: "http://a", capabilities: ["chat"] },

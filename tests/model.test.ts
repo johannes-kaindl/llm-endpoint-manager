@@ -76,6 +76,18 @@ describe("models and backend", () => {
   });
 });
 
+describe("displayFamily", () => {
+  it("keeps a valid displayFamily (incl. apple-fm) and drops an unknown one", () => {
+    const s = loadSettings({ endpoints: [{
+      id: "e1", label: "A", url: "apple-shortcuts://on-device", provider: "apple-shortcuts", capabilities: ["chat"],
+      models: [{ id: "apple-fm", displayFamily: "apple-fm" }, { id: "g", family: "gpt-oss", displayFamily: "gpt-oss" }, { id: "x", displayFamily: "llama" }],
+    }] });
+    expect(s.endpoints[0]!.models).toEqual([
+      { id: "apple-fm", displayFamily: "apple-fm" }, { id: "g", family: "gpt-oss", displayFamily: "gpt-oss" }, { id: "x" },
+    ]);
+  });
+});
+
 describe("transport und shortcut (apple-shortcuts)", () => {
   it("uebernimmt transport und shortcut bei gueltigen Werten", () => {
     const e = normalizeEndpointEntry(

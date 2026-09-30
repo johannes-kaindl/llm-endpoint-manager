@@ -84,9 +84,11 @@ export function probeReachable(cfg: EndpointConfig, provider: Provider): Promise
   return probeStatus(cfg, provider).then((s) => s.reachable);
 }
 
-/** `apple-shortcuts` hat keine Modell-Liste zum Abfragen — die (einzige) Modellbeschreibung
- *  kommt vorbevölkert über den Preset (`ep.models`, Spec § Baustein 2), `modelRows()` zeigt sie
- *  auch ohne Live-Discovery an (src/core/model-rows.ts). */
+/** `apple-shortcuts` hat keine Modell-Liste zum Abfragen — die (einzige) Modellzeile
+ *  `{ id: "apple-fm", displayFamily: "apple-fm" }` kommt vorbevölkert über den Preset
+ *  (`ProviderPreset.models`, beim Anlegen nach `ep.models` kopiert), `modelRows()` zeigt sie
+ *  auch ohne Live-Discovery an (src/core/model-rows.ts). Vor Welle 14 stand das hier, der
+ *  Preset trug aber keine Zeile. */
 export async function listModels(cfg: EndpointConfig, provider: Provider, timeoutMs: number = PROBE_TIMEOUT_MS): Promise<string[]> {
   if (provider === "apple-shortcuts") return [];
   const probe = providerProbe(provider);

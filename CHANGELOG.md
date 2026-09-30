@@ -6,8 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- The Apple Intelligence (on-device) preset now carries its one model row (`apple-fm`, display family "Apple Foundation Models"), and the model table draws that block from this data instead of a fixed paragraph; the limits text (4096-token context, no streaming, no sampling parameters, no tool calls, no vision input) stays underneath as a supplement. Consumers see the model with `displayFamily: "apple-fm"` through `list()`/`get()` (additive, plugin API stays at version 1). Kit: `obsidian-kit` 0.46.0, `code-kit` 0.9.0.
+
 ### Fixed
 
+- The limits text under the Apple Intelligence model block no longer renders in heading size (it had no style rule).
 - The preset buttons under the endpoint list no longer stay English in a German interface: "OpenAI-compatible cloud" now reads "OpenAI-kompatible Cloud" and "Apple Intelligence (on-device)" reads "Apple Intelligence (auf dem Gerät)" (brand names such as LM Studio and Ollama stay as they are). The tooltip "Add …" follows the same wording.
 - The empty "Other spelling of" field in the model table no longer shows a truncated label as its placeholder; it now says "Model id" / "Modell-ID", the full explanation stays in the field's accessible label.
 

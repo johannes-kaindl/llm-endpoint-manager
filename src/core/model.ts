@@ -2,7 +2,7 @@ import { mergeSettings } from "../vendor/kit/settings";
 import type { EndpointConfig } from "../vendor/kit/endpoint_config";
 import { secretIdFor } from "../vendor/kit/secrets";
 import type { Provider, Capability, ApiModelInfo, EndpointTransport, ShortcutTransportConfig } from "../vendor/kit/endpoint-source";
-import { BACKEND_IDS, FAMILY_IDS, type BackendId, type FamilyId } from "../vendor/kit/sampling-profiles";
+import { BACKEND_IDS, FAMILY_IDS, MODEL_FAMILY_IDS, type BackendId, type FamilyId, type ModelFamilyId } from "../vendor/kit/sampling-profiles";
 
 export type { Provider, Capability, EndpointTransport, ShortcutTransportConfig } from "../vendor/kit/endpoint-source";
 
@@ -95,6 +95,8 @@ function modelsOf(raw: unknown): ApiModelInfo[] | undefined {
     if (!id) continue;
     const row: ApiModelInfo = { id };
     if (typeof o.family === "string" && (FAMILY_IDS as readonly string[]).includes(o.family)) row.family = o.family as FamilyId;
+    // Anzeige-Familie gegen MODEL_FAMILY_IDS (kennt apple-fm), nicht gegen FAMILY_IDS (Sampling-Familien).
+    if (typeof o.displayFamily === "string" && (MODEL_FAMILY_IDS as readonly string[]).includes(o.displayFamily)) row.displayFamily = o.displayFamily as ModelFamilyId;
     const alias = str(o.aliasOf);
     if (alias && alias !== id) row.aliasOf = alias;
     out.push(row);

@@ -1,4 +1,5 @@
 import { extractModelIds } from "../vendor/kit/endpoint_diagnostics";
+import type { ApiModelInfo } from "../vendor/kit/endpoint-source";
 import type { Capability, Provider, ShortcutTransportConfig } from "./model";
 import { APPLE_SHORTCUTS_URL, DEFAULT_SHORTCUT_NAME, DEFAULT_SHORTCUT_TIMEOUT_MS } from "./model";
 
@@ -32,6 +33,8 @@ export function providerProbe(p: Provider): ProviderProbe | null {
 }
 
 export interface ProviderPreset {
+  /** Vorbelegte Modellzeilen (additiv): ein Anbieter ohne Modell-Liste zum Abfragen (apple-shortcuts) beschreibt sein eines Modell hier; die Preset-Anlage kopiert sie in den Endpunkt. */
+  models?: ApiModelInfo[];
   /** Kanonische (englische) Bezeichnung; die Oberfläche zeigt sie über `labelKey`, sofern gesetzt. Marken (LM Studio, Ollama) tragen keinen Schlüssel. */
   label: string;
   labelKey?: string;
@@ -48,6 +51,7 @@ export const PRESETS: readonly ProviderPreset[] = [
   { label: "OpenAI-compatible cloud", labelKey: "preset.cloud", url: "https://", provider: "openai", capabilities: ["chat"] },
   {
     label: "Apple Intelligence (on-device)", labelKey: "preset.apple", url: APPLE_SHORTCUTS_URL, provider: "apple-shortcuts", capabilities: ["chat"],
+    models: [{ id: "apple-fm", displayFamily: "apple-fm" }],
     transport: "shortcuts", shortcut: { name: DEFAULT_SHORTCUT_NAME, timeoutMs: DEFAULT_SHORTCUT_TIMEOUT_MS },
   },
 ];

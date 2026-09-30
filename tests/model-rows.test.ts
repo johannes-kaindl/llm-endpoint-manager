@@ -15,6 +15,19 @@ describe("modelRows", () => {
   });
 });
 
+describe("displayFamily in den Zeilen", () => {
+  it("modelRows traegt displayFamily, ohne eine Sampling-Familie zu erfinden", () => {
+    expect(modelRows([], [{ id: "apple-fm", displayFamily: "apple-fm" }])).toEqual([
+      { id: "apple-fm", displayFamily: "apple-fm", suggested: null },
+    ]);
+  });
+  it("setModelMeta behaelt eine Zeile, die nur displayFamily traegt", () => {
+    const e = ep({ provider: "apple-shortcuts", models: [{ id: "apple-fm", displayFamily: "apple-fm" }] });
+    expect(setModelMeta(e, "other", { aliasOf: "x" }).models).toEqual([{ id: "apple-fm", displayFamily: "apple-fm" }, { id: "other", aliasOf: "x" }]);
+    expect(setModelMeta(e, "apple-fm", { family: null }).models).toEqual([{ id: "apple-fm", displayFamily: "apple-fm" }]);
+  });
+});
+
 describe("setModelMeta", () => {
   it("sets and clears family and alias; empty rows and empty lists disappear", () => {
     let e = setModelMeta(ep(), "verdigado-pro", { family: "gpt-oss" });

@@ -1,8 +1,8 @@
-import { familyFromName, type FamilyId } from "../vendor/kit/sampling-profiles";
+import { familyFromName, type FamilyId, type ModelFamilyId } from "../vendor/kit/sampling-profiles";
 import type { ApiModelInfo } from "../vendor/kit/endpoint-source";
 import type { ManagedEndpoint } from "./model";
 
-export interface ModelRow { id: string; family?: FamilyId; suggested: FamilyId | null; aliasOf?: string }
+export interface ModelRow { id: string; family?: FamilyId; displayFamily?: ModelFamilyId; suggested: FamilyId | null; aliasOf?: string }
 
 export function modelRows(listed: string[], stored: ApiModelInfo[] | undefined): ModelRow[] {
   const out: ModelRow[] = [];
@@ -12,6 +12,7 @@ export function modelRows(listed: string[], stored: ApiModelInfo[] | undefined):
     seen.add(id);
     const row: ModelRow = { id, suggested: info?.family ? null : familyFromName(id) };
     if (info?.family) row.family = info.family;
+    if (info?.displayFamily) row.displayFamily = info.displayFamily;
     if (info?.aliasOf) row.aliasOf = info.aliasOf;
     out.push(row);
   };
@@ -32,7 +33,7 @@ export function setModelMeta(
     const a = patch.aliasOf.trim();
     if (a && a !== id) row.aliasOf = a; else delete row.aliasOf;
   }
-  const kept = rows.filter((m) => m.family !== undefined || m.aliasOf !== undefined);
+  const kept = rows.filter((m) => m.family !== undefined || m.displayFamily !== undefined || m.aliasOf !== undefined);
   const { models: _old, ...rest } = ep;
   void _old;
   return kept.length ? { ...rest, models: kept } : rest;

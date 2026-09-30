@@ -8,7 +8,7 @@ import { createModelListCache, type ModelListCache } from "../vendor/kit/model-l
 import type { EndpointStatusKind } from "../vendor/kit/endpoint_diagnostics";
 import { authHeaders, type EndpointRole } from "../vendor/kit/endpoint_config";
 import { normalizeEndpoint } from "../vendor/kit/endpoint";
-import { BACKEND_IDS, BACKENDS, FAMILIES, FAMILY_IDS, type BackendId, type FamilyId } from "../vendor/kit/sampling-profiles";
+import { BACKEND_IDS, BACKENDS, FAMILIES, FAMILY_IDS, MODEL_FAMILIES, type BackendId, type FamilyId } from "../vendor/kit/sampling-profiles";
 import { probeBaseUrl, probeEndpoint } from "../vendor/kit/capabilities";
 import { CAPABILITIES, PROVIDERS, DEFAULT_SHORTCUT_NAME, DEFAULT_SHORTCUT_TIMEOUT_MS, labelFromUrl, newId, type ManagedEndpoint, type Provider } from "../core/model";
 import { modelRows, setModelMeta, type ModelRow } from "../core/model-rows";
@@ -139,6 +139,7 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
         capabilities: preset ? [...preset.capabilities] : ["chat"], enabled: true };
       if (preset?.transport) out.transport = preset.transport;
       if (preset?.shortcut) out.shortcut = { ...preset.shortcut };
+      if (preset?.models) out.models = preset.models.map((m) => ({ ...m }));
       return out;
     });
   }
@@ -286,11 +287,20 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
       // apple-shortcuts hat weder eine Sampling-Familie (FamilyId ist an code-kits
       // Request-Tuning-Vertrag gekoppelt, den dieser Provider nicht bedient — keine
       // Sampling-Parameter, kein HTTP-Backend) noch eine per HTTP erkennbare Backend-Software.
-      // Beschreibung als fester Text statt der beiden Blöcke (Befund an den Master, 2026-09-27).
-      if (ep.provider === "apple-shortcuts") { host.createDiv({ cls: "lem-row-note", text: t("ep.appleModelDesc") }); continue; }
+      // Statt der beiden Blöcke: die Modellzeile mit Anzeige-Familie aus den Kit-Daten, darunter
+      // der Grenzen-Text (Kontext, Streaming, Tools) als Ergänzung.
+      if (ep.provider === "apple-shortcuts") { this.renderAppleModels(host, ep); continue; }
       this.renderModels(host, ep);
       this.renderBackend(host, ep);
     }
+  }
+
+  private renderAppleModels(host: HTMLElement, ep: ManagedEndpoint): void {
+    for (const row of modelRows([], ep.models)) {
+      const setting = new Setting(host).setName(row.id);
+      if (row.displayFamily) setting.setDesc(MODEL_FAMILIES[row.displayFamily].label);
+    }
+    host.createDiv({ cls: "lem-row-note", text: t("ep.appleModelDesc") });
   }
 
   private renderModels(host: HTMLElement, cfg: ManagedEndpoint): void {
