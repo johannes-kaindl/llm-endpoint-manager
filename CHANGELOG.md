@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- The changelog is now written entirely in English.
+
 ## [0.5.0] — 2026-09-30
 
 ### Added
