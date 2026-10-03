@@ -67,7 +67,7 @@ All notable changes to this project are documented here. The format follows
 ## [0.2.1] — 2026-09-24
 
 ### Changed
-- `authorUrl` im Manifest zeigt wieder auf das GitHub-Profil (Rückkehr in den Community Store); keine Funktionsänderung.
+- `authorUrl` in the manifest points to the GitHub profile again (return to the Community Store); no functional change.
 
 ## [0.2.0] — 2026-09-23
 
