@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.5.1] — 2026-10-03
+
 ### Changed
 
 - The changelog is now written entirely in English.
