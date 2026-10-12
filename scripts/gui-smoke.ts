@@ -13,16 +13,22 @@
  *   echo "$STAGING_VAULTS_DIR"                                         # muss gesetzt sein
  *   npm run build && npm run smoke:gui -- --setup
  *   UD=/tmp/obs-test-llm-endpoint-manager; mkdir -p "$UD"
- *   lsof -nP -iTCP:9346 -sTCP:LISTEN && echo "Port belegt — anderen nehmen"
- *   node -e 'const p=process.env.STAGING_VAULTS_DIR+"/llm-endpoint-manager";require("fs").writeFileSync(process.argv[1]+"/obsidian.json",JSON.stringify({vaults:{"llm-endpoint-manager":{path:p,ts:Date.now(),open:true}}}))' "$UD"
+ *   lsof -nP -iTCP:9395 -sTCP:LISTEN && echo "Port belegt — anderen nehmen"
+ *   pgrep -f "user-data-dir=$UD" && echo "Profil belegt — auf $UD-w19 ausweichen, nie beenden"
  *   cp ~/Library/Application\ Support/obsidian/obsidian-*.asar "$UD"/   # aktuelle Version statt gebuendelter (minAppVersion 1.11.4)
- *   /Applications/Obsidian.app/Contents/MacOS/Obsidian --user-data-dir="$UD" --remote-debugging-port=9346 &
- *   python3 ~/.claude/hooks/obsidian-cdp-lock.py acquire --label llm-endpoint-manager --intent "GUI-Smoke Task 13" --exclusive focus --ttl 300
- *   npm run smoke:gui -- --port 9346
+ *   node -e 'const p=process.env.STAGING_VAULTS_DIR+"/llm-endpoint-manager";require("fs").writeFileSync(process.argv[1]+"/obsidian.json",JSON.stringify({vaults:{"llm-endpoint-manager":{path:p,ts:Date.now(),open:true}},language:"en"}))' "$UD"
+ *   /Applications/Obsidian.app/Contents/MacOS/Obsidian --user-data-dir="$UD" --remote-debugging-port=9395 &   # je Messlauf ein frischer Prozess
+ *   python3 ~/.claude/hooks/obsidian-cdp-lock.py acquire --label llm-endpoint-manager --intent "GUI-Smoke :9395" --exclusive focus --port 9395 --ttl 300
+ *   npm run smoke:gui -- --port 9395          # --port ist Pflicht
  *   python3 ~/.claude/hooks/obsidian-cdp-lock.py release
+ *   kill <PID der eigenen Instanz>
  *
- * Ein frisches Profil startet im Restricted Mode — C1 schaltet ihn per
- * `app.plugins.setEnable(true)` frei, bevor irgendetwas anderes gemessen wird.
+ * Vertrauensdialog und Restricted Mode eines frischen Profils erledigt `bereiteInstanzVor`
+ * (Brücke) vor der ersten Messung; C1 meldet ihren `hinweis`. Der erste Lauf nach der
+ * Profilanlage ist ein Aufwärmlauf und zählt nicht.
+ *
+ * Bilanz in vier Zuständen (CORE-TEST-19): grün · rot · übersprungen · nichts gemessen. Nenner ist
+ * `PUNKTE`; ein Punkt, der nie aufgezeichnet wurde (Abbruch), zählt als „nichts gemessen".
  *
  * Typen: `tsconfig.scripts.json` (im `gate` ueber `npm run typecheck:scripts`).
  */
@@ -33,7 +39,8 @@ import { join } from "node:path";
 import { cwd } from "node:process";
 import type { AddressInfo } from "node:net";
 
-import { Cdp, attachTo, clickReal, pollUntil, requireVisible } from "../../tools/obsidian-cdp/cdp.js";
+import { Cdp, attachTo, bereiteInstanzVor, clickReal, pollUntil, requireVisible } from "../../tools/obsidian-cdp/cdp.js";
+import { createBilanz, parseArgs, runDriver } from "../../tools/obsidian-cdp/bilanz.js";
 import { buildVault, requireEigenerBuild, stagingVaultDir } from "../../tools/obsidian-cdp/vault.js";
 
 const REPO_NAME = "llm-endpoint-manager";
@@ -41,17 +48,26 @@ const PLUGIN_ID = "llm-endpoint-manager";
 const REPO_ROOT = cwd();
 const FIXTURE_DIR = join(REPO_ROOT, "fixtures/vault");
 
-type Zustand = "gruen" | "rot" | "uebersprungen";
-interface Check { name: string; zustand: Zustand; detail: string }
-const checks: Check[] = [];
-function record(name: string, passed: boolean, detail: string): void {
-  checks.push({ name, zustand: passed ? "gruen" : "rot", detail });
-  console.log(`${passed ? "  ✓" : "  ✗"} ${name} — ${detail}`);
-}
-function skipped(name: string, reason: string): void {
-  checks.push({ name, zustand: "uebersprungen", detail: reason });
-  console.log(`  · ${name} — übersprungen: ${reason}`);
-}
+const PUNKTE = [
+  "C1 Restricted-Mode-Guard (Plugin nach setEnable geladen)",
+  "C2 Keine liegen gebliebenen Test-Endpunkte aus einem abgebrochenen Vorlauf",
+  "A1 Settings-Tab offen, Adder-Zeile leer",
+  "A2 Preset LM Studio → Zeile localhost:1234, openai, chat/vision/embedding",
+  "A3 Token setzen → secretStorage=sk-test, data.json ohne sk-test, Zeile „Token gespeichert“",
+  "A4 Token entfernen → Secret null, Zeile zeigt Passwortfeld",
+  "A5 Endpunkt entfernen → Secret null, Liste leer",
+  "B1 api.list({capability:\"embedding\"}) → genau der Fake-Eintrag",
+  "B2 api.resolve(\"chat\",{caller}) → config.url=Fake-Server, Konsumenten-Übersicht zeigt gui-smoke — chat",
+  "B3 Fake-Server stoppen → no-endpoint; innerhalb TTL trotz Neustart weiter no-endpoint (Cache); api.models(force) wieder erreichbar",
+  "D1 Modellblock sichtbar — Zeile für verdigado-pro",
+  "E1 Zusatzzeile: Bezeichnung, Protokoll, Fähigkeiten, Aktiv sind sichtbar beschriftet",
+  "F1 Hilfe-Zeile ist die erste Zeile, sichtbar, mit „Open documentation“ und bug-Knopf",
+  "D2 Familie für ein Alias setzen → nach Neuladen der Settings wieder da",
+  "D3 „Erkennen“ gegen Fake-LM-Studio liefert lmstudio (nur Lesen, kein Modell-Load)",
+  "G1 Preset Apple Intelligence (on-device) → Zeile mit transport=shortcuts, Kurzbefehl-Name, KEIN HTTP-Ziel, Modellzeile apple-fm (displayFamily) und Modellblock aus Kit-Daten",
+  "G2 Filter-Default: list() ohne transports-Opt-in zeigt apple-shortcuts NICHT, list({transports:[\"shortcuts\"]}) UND resolve() bleibt bei http; der Opt-in-Eintrag traegt displayFamily apple-fm",
+] as const;
+const { record, abschluss } = createBilanz({ punkte: PUNKTE });
 
 const q = (s: unknown): string => JSON.stringify(s);
 
@@ -189,18 +205,17 @@ function setup(): void {
   for (const l of log) console.log(`  · ${l}`);
   console.log(
     "\nZweitinstanz starten (Rezept im Dateikopf), dann:\n" +
-    "  npm run smoke:gui -- --port 9346",
+    "  npm run smoke:gui -- --port 9395",
   );
 }
 
 async function main(): Promise<void> {
-  const argv = process.argv.slice(2);
-  if (argv.includes("--setup")) { setup(); return; }
-  const flag = (name: string): string | undefined => {
-    const i = argv.indexOf(`--${name}`);
-    return i === -1 ? undefined : argv[i + 1];
-  };
-  const port = Number(flag("port") ?? 9346);
+  const args = parseArgs(process.argv.slice(2));
+  if (args.has("setup")) { setup(); return; }
+  const port = Number(args.value("port"));
+  if (!Number.isInteger(port) || port < 1024 || port > 65535) {
+    throw new Error("--port <1024-65535> ist Pflicht (kein Standardport: 9222 gehoert der regulaeren Instanz). Beispiel: npm run smoke:gui -- --port 9395");
+  }
 
   console.log(`GUI-Smoke llm-endpoint-manager — Obsidian auf Port ${port}`);
   const cdp = await attachTo("workspace", port, REPO_NAME);
@@ -271,31 +286,21 @@ async function main(): Promise<void> {
 
     // --- C1: Restricted-Mode-Guard -------------------------------------------------
     console.log("C · Zweitinstanz-Grundlage");
+    // Vertrauensdialog, Restricted Mode und Plugin-Laden einer frischen Instanz: zentrale Bruecke
+    // (nichts angefasst, wenn der Vault nicht REPO_NAME heisst).
+    const instanz = await bereiteInstanzVor(cdp, { pluginIds: [PLUGIN_ID], nurVault: REPO_NAME, sprache: "en" });
     // Plugin neu laden, BEVOR irgendetwas gemessen wird: Obsidian haelt main.js im Speicher,
     // ein frisch deploytes Bundle wirkt sonst erst nach einem manuellen Reload (koda-agent-
-    // Lehre, LESSONS 2026-09-03). War es noch nicht aktiv (Restricted Mode), scheitert dieser
-    // Aufruf leise — C1 uebernimmt dann das Freischalten.
+    // Lehre, LESSONS 2026-09-03).
     await cdp.evaluate(`
       try {
         await app.plugins.disablePlugin(${q(PLUGIN_ID)});
         await app.plugins.enablePlugin(${q(PLUGIN_ID)});
-      } catch { /* noch nicht aktiv — C1 schaltet frei */ }
+      } catch { /* wird unten als nicht geladen gemeldet */ }
       return true;
     `);
-    let geladen = (await cdp.evaluate<{ g: boolean }>(`return { g: Boolean(app.plugins.plugins[${q(PLUGIN_ID)}]) };`)).g;
-    let frei = "";
-    if (!geladen) {
-      frei = (await cdp.evaluate<{ s: string }>(`
-        try {
-          if (app.plugins.setEnable) await app.plugins.setEnable(true);
-          await app.plugins.enablePluginAndSave(${q(PLUGIN_ID)});
-          await new Promise((r) => setTimeout(r, 1200));
-          return { s: app.plugins.plugins[${q(PLUGIN_ID)}] ? "freigeschaltet" : "Aufruf ohne Wirkung" };
-        } catch (e) { return { s: "Fehler: " + (e && e.message ? e.message : String(e)) }; }
-      `)).s;
-      geladen = (await cdp.evaluate<{ g: boolean }>(`return { g: Boolean(app.plugins.plugins[${q(PLUGIN_ID)}]) };`)).g;
-    }
-    record("C1 Restricted-Mode-Guard (Plugin nach setEnable geladen)", geladen, geladen ? `Vault ${vaultInfo.name}${frei ? ` (${frei})` : " (bereits aktiv)"}` : `app.plugins.plugins.${PLUGIN_ID} fehlt — ${frei || "kein Freischaltversuch"}`);
+    const geladen = (await cdp.evaluate<{ g: boolean }>(`return { g: Boolean(app.plugins.plugins[${q(PLUGIN_ID)}]) };`)).g;
+    record("C1 Restricted-Mode-Guard (Plugin nach setEnable geladen)", geladen, geladen ? `Vault ${vaultInfo.name} — ${instanz.hinweis}` : `app.plugins.plugins.${PLUGIN_ID} fehlt — ${instanz.hinweis}`);
     if (!geladen) throw new Error("Ohne geladenes Plugin ist jeder weitere Punkt gegenstandslos.");
 
     // Frischer Ausgangszustand: alle evtl. vom letzten Lauf verbliebenen Endpunkte weg. Ein
@@ -555,7 +560,7 @@ async function main(): Promise<void> {
     `);
     record(
       "F1 Hilfe-Zeile ist die erste Zeile, sichtbar, mit „Open documentation“ und bug-Knopf",
-      helpRow.first === "Help" && helpRow.button === "Open documentation" && helpRow.bug && helpRow.visible,
+      ["Help", "Hilfe"].includes(helpRow.first) && ["Open documentation", "Dokumentation öffnen"].includes(helpRow.button) && helpRow.bug && helpRow.visible,
       JSON.stringify(helpRow),
     );
 
@@ -685,19 +690,12 @@ async function main(): Promise<void> {
     // SIGINT, das den Lauf knapp verpasst, liess den Node-Prozess nie beenden).
     process.off("SIGINT", onAbortSignal);
     process.off("SIGTERM", onAbortSignal);
+    // Auch nach einem Abbruch: Punkte, die nie aufgezeichnet wurden, zaehlen als „nichts gemessen“.
+    abschluss();
+    // Build-Herkunft-Warnung ("ungeklaert") gehoert in die Abschlusszeile, nicht nur nach oben
+    // ins Protokoll — sonst wird sie zwischen neun gruenen Haken uebersehen.
+    for (const w of warnungen) console.log(`\n${w}`);
   }
-
-  const failed = checks.filter((c) => c.zustand === "rot");
-  const skippedN = checks.filter((c) => c.zustand === "uebersprungen").length;
-  console.log(`\n${checks.length - failed.length - skippedN}/${checks.length} grün, ${skippedN} übersprungen`);
-  if (failed.length > 0) {
-    console.log("Rot:");
-    for (const c of failed) console.log(`  - ${c.name}: ${c.detail}`);
-    process.exitCode = 1;
-  }
-  // Build-Herkunft-Warnung ("ungeklaert") gehoert in die Abschlusszeile, nicht nur nach oben
-  // ins Protokoll — sonst wird sie zwischen neun gruenen Haken uebersehen.
-  for (const w of warnungen) console.log(`\n${w}`);
 }
 
 /** `STAGING_VAULTS_DIR` optional lesen, ohne bei Fehlen zu werfen — A3 prueft `data.json`
@@ -727,7 +725,4 @@ async function startFakeEndpointOnPort(url: string): Promise<{ url: string; clos
   return { url, close: () => new Promise<void>((resolve) => { server.close(() => { resolve(); }); }) };
 }
 
-main().catch((error: unknown) => {
-  console.error(`\nAbbruch: ${error instanceof Error ? error.message : String(error)}`);
-  process.exitCode = 1;
-});
+runDriver(main);

@@ -1,6 +1,6 @@
 # GUI-Smoke — llm-endpoint-manager
 
-Faehrt neun Pruefpunkte gegen ein LAUFENDES Obsidian (CDP, CORE-TEST-02 b): Schluesselbund
+Faehrt die Pruefpunkte (Soll-Liste `PUNKTE` im Treiber) gegen ein LAUFENDES Obsidian (CDP, CORE-TEST-02 b): Schluesselbund
 (A1-A5), API gegen einen im Treiber selbst laufenden Fake-Endpunkt (B1-B3), Restricted-Mode-
 Guard einer frischen Zweitinstanz (C1). Treiber: `scripts/gui-smoke.ts`.
 
@@ -14,21 +14,26 @@ Guard einer frischen Zweitinstanz (C1). Treiber: `scripts/gui-smoke.ts`.
 ```bash
 npm run build && npm run smoke:gui -- --setup
 UD=/tmp/obs-test-llm-endpoint-manager; mkdir -p "$UD"
-lsof -nP -iTCP:9346 -sTCP:LISTEN && echo "Port belegt — anderen nehmen"
+lsof -nP -iTCP:9395 -sTCP:LISTEN && echo "Port belegt — anderen nehmen"
 node -e 'const p=process.env.STAGING_VAULTS_DIR+"/llm-endpoint-manager";require("fs").writeFileSync(process.argv[1]+"/obsidian.json",JSON.stringify({vaults:{"llm-endpoint-manager":{path:p,ts:Date.now(),open:true}}}))' "$UD"
+pgrep -f "user-data-dir=$UD" && echo "Profil belegt — auf $UD-w19 ausweichen, nie beenden"
 cp ~/Library/Application\ Support/obsidian/obsidian-*.asar "$UD"/   # aktuelle Version, nicht die gebuendelte
-/Applications/Obsidian.app/Contents/MacOS/Obsidian --user-data-dir="$UD" --remote-debugging-port=9346 &
-python3 ~/.claude/hooks/obsidian-cdp-lock.py acquire --label llm-endpoint-manager --intent "GUI-Smoke" --exclusive focus --ttl 300
-npm run smoke:gui -- --port 9346
+/Applications/Obsidian.app/Contents/MacOS/Obsidian --user-data-dir="$UD" --remote-debugging-port=9395 &
+python3 ~/.claude/hooks/obsidian-cdp-lock.py acquire --label llm-endpoint-manager --intent "GUI-Smoke :9395" --exclusive focus --port 9395 --ttl 300
+npm run smoke:gui -- --port 9395
 python3 ~/.claude/hooks/obsidian-cdp-lock.py release
 ```
 
-Ein frisches Profil startet im Restricted Mode; C1 schaltet ihn per `app.plugins.setEnable(true)`
-frei, bevor irgendetwas anderes gemessen wird. Bei jedem Lauf wird das Plugin vorher per
+Ein frisches Profil startet im Restricted Mode und fragt nach dem Vertrauen in den Vault;
+`bereiteInstanzVor` (zentrale Brücke) bestätigt den Dialog und schaltet den Modus frei, bevor
+irgendetwas gemessen wird, C1 trägt ihren Hinweis im Detail. `--port` ist Pflicht. Die Bilanz
+zählt in vier Zuständen (grün · rot · übersprungen · nichts gemessen), Nenner ist die Soll-Liste;
+ein Abbruch endet mit Exit 2. Je Messlauf ein frischer Prozess, der erste Lauf nach der
+Profilanlage ist ein Aufwärmlauf. Bei jedem Lauf wird das Plugin vorher per
 `disablePlugin`/`enablePlugin` neu geladen, damit ein frisch deploytes Bundle auch wirklich
 greift (Obsidian haelt `main.js` sonst im Speicher).
 
-## Die 9 Pruefpunkte
+## Die Pruefpunkte
 
 | # | Prüft |
 |---|---|
@@ -67,7 +72,7 @@ immer live. Der Treiber nutzt das bewusst aus, um beide Cache-Schichten getrennt
 Beleg, dass B3 wirklich die TTL/Cache-Semantik misst und nicht zufällig grün ist: `REACHABILITY_TTL_MS`
 in `src/core/reachability.ts` testweise auf `0` gesetzt (Cache-Einträge laufen sofort ab),
 gebaut, ins Staging-Vault deployt, Lauf wiederholt — danach zurückgesetzt und erneut grün
-verifiziert. Beide Läufe gegen dieselbe Zweitinstanz (Port 9346), Plugin vor jedem Lauf per
+verifiziert. Beide Läufe gegen dieselbe Zweitinstanz (Port 9395), Plugin vor jedem Lauf per
 `disablePlugin`/`enablePlugin` neu geladen.
 
 **Lage 1 — TTL = 30 000 ms (Normalzustand):** 9/9 grün, 0 übersprungen.

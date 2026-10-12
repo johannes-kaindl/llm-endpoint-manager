@@ -192,7 +192,10 @@ async function main(): Promise<void> {
   };
   if (args.includes("--setup")) { setup(); return; }
 
-  const port = Number(flag("port") ?? 9222);
+  const port = Number(flag("port"));
+  if (!Number.isInteger(port) || port < 1024 || port > 65535) {
+    throw new Error("--port <1024-65535> ist Pflicht (kein Standardport: 9222 gehoert der regulaeren Instanz).");
+  }
   const only = flag("only");
   const outDir = flag("out") ?? "docs/images";
   const explore = args.includes("--explore");
