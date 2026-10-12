@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- Settings, endpoint list: the "move to top" and "remove endpoint" buttons stay together in one row instead of the bin icon sitting alone on a second line when the settings window is narrow; at about 800 px the pair wraps together and moves to the right. The key and model fields are somewhat narrower and the address stays fully visible (the endpoint list is `obsidian-kit` 0.59.0; this plugin's own stylesheet now carries the same copy of the kit rules).
+- Kit pins raised to `obsidian-kit` 0.59.0 and `code-kit` 0.24.0 (from 0.56.0 and 0.23.0). The plugin API stays at version 1 and answers as before. Of the skipped releases (0.56.1, 0.56.2, 0.57.0, 0.58.0, 0.59.0 and code-kit 0.24.0) only the endpoint list reaches this plugin; the new "no model row" option of the endpoint-source section does not apply here, because this plugin is the source of endpoints, not a consumer.
+
 ## [0.6.1] — 2026-10-12
 
 ### Fixed

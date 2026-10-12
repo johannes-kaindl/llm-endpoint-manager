@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.56.0, src/obsidian/shortcuts-bridge.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.59.0, src/obsidian/shortcuts-bridge.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 /** Die einzige Brücke von einem Obsidian-Plugin zu Apples on-device-Fähigkeiten (LLM, STT, OCR,
  *  TTS, Bildgenerierung) über Kurzbefehle — auf iOS gibt es keinen anderen Weg (JS-only,
  *  Codesigning, Nachbar-App-Server werden suspendiert). One-shot, kein Streaming, sichtbarer

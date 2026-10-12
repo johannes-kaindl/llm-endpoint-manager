@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.56.0, src/testing/obsidian-mock.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.59.0, src/testing/obsidian-mock.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 // Self-contained Obsidian test double for obsidian-kit.
 // - Zero external imports (NOT from "obsidian", NOT from "vitest").
 // - Consumed via vitest `resolve.alias` as a drop-in for `import ... from "obsidian"`,
@@ -134,6 +134,8 @@ export function makeFakeEl(tagName = "DIV"): any {
     removeClass: (...cls: string[]) => {
       el.className = el.className.split(" ").filter((x: string) => x && !cls.includes(x)).join(" ");
     },
+    /** Wie Obsidians `removeClasses(string[])`: eine LISTE, keine Einzelargumente (slide-deck, Welle 19). */
+    removeClasses: (cls: string[]) => el.removeClass(...cls),
     toggleClass: (cls: string, on?: boolean) => {
       const parts = el.className.split(" ").filter(Boolean).filter((p: string) => p !== cls);
       const shouldAdd = on === undefined ? !el.className.split(" ").includes(cls) : on;
@@ -164,6 +166,9 @@ export function makeFakeEl(tagName = "DIV"): any {
       walk(el);
       return out;
     },
+
+    /** Erster Treffer von `querySelectorAll` in Dokumentreihenfolge, sonst `null` (health-vitals, Welle 19). */
+    querySelector: (selector: string) => el.querySelectorAll(selector)[0] ?? null,
 
     addEventListener: (event: string, cb: (...a: any[]) => void) => { (listeners[event] ??= []).push(cb); },
     removeEventListener: (event: string, cb: (...a: any[]) => void) => {
@@ -700,6 +705,28 @@ export class FuzzySuggestModal<T> {
   __close(): void { this.onClose(); }
 }
 
+/** `SuggestModal<T>` (slide-deck, Welle 19): im echten Obsidian ein Modal mit Eingabefeld und Vorschlagsliste. Ohne die Klasse
+ *  bricht ein Import, der von ihr erbt, mit „Class extends value undefined“. Anders als `FuzzySuggestModal` (hier ohne Modal-Basis)
+ *  erbt sie von `Modal`; `open()`/`close()` tun nichts, wie in der Hand-Kopie, aus der sie stammt. */
+export class SuggestModal<T> extends Modal {
+  inputEl: { value: string } = { value: "" };
+  /** Letzte gebaute Instanz, damit ein Test sie erreicht, wenn das Plugin sie selbst baut. */
+  static __instance: any = null;
+  constructor(app?: any) {
+    super(app);
+    (this.constructor as any).__instance = this;
+    SuggestModal.__instance = this;
+  }
+  setPlaceholder(_s: string): this { return this; }
+  getSuggestions(_query: string): T[] | Promise<T[]> { return []; }
+  renderSuggestion(_value: T, _el: any): void {}
+  onChooseSuggestion(_value: T, _evt?: any): void {}
+  open(): void {}
+  close(): void {}
+  onOpen(): void {}
+  onClose(): void {}
+}
+
 // ---------------------------------------------------------------------------
 // Menus (json_viewer).
 // ---------------------------------------------------------------------------
@@ -747,6 +774,48 @@ export function setTooltip(el: any, tooltip: string): void {
   el.setAttribute?.("data-tooltip", tooltip);
 }
 export function getLanguage(): string { return "en"; }
+
+// ---------------------------------------------------------------------------
+// Welle 19: Zusätze aus den Hand-Kopien (calendar-notes, health-vitals/vault-rag).
+// ---------------------------------------------------------------------------
+const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*\r?\n?/;
+
+/** `getFrontMatterInfo(content)` (calendar-notes, Welle 19): Nachbildung nach `obsidian.d.ts`. Erkennt nur den einfachen
+ *  `---\n…\n---`-Block am Dateianfang, ohne YAML zu lesen — gebraucht werden die Offsets (`contentStart` = Beginn des Rumpfes).
+ *  Grenzen: ein leerer Block (`---\n---\n`) gilt als „kein Block“, und `frontmatter` ist der Text ohne die Begrenzer.
+ *  `from`/`to` zählen die Zeichen des Blocktextes im Original, auch bei CRLF (die Hand-Kopie rechnete `from` mit 4 fest). */
+export function getFrontMatterInfo(content: string): { exists: boolean; frontmatter: string; from: number; to: number; contentStart: number } {
+  const m = FRONTMATTER_RE.exec(content);
+  if (!m) return { exists: false, frontmatter: "", from: 0, to: 0, contentStart: 0 };
+  const block = m[1] ?? "";
+  const from = content.indexOf("\n") + 1;
+  return { exists: true, frontmatter: block, from, to: from + block.length, contentStart: m[0].length };
+}
+
+/** `SecretComponent` (Obsidian 1.11.1; calendar-notes, Welle 19): ein VERWEIS auf einen Schlüsselbund-Eintrag, kein Passwortfeld.
+ *  `setValue` nimmt die Secret-ID, der Rückruf liefert wieder die ID des im Dialog gewählten Eintrags, nie dessen Wert; das X löst
+ *  die Verknüpfung und ruft mit `null` zurück. `choose(id)` ist die Testhilfe für die Wahl im Dialog, `instances` sammelt jede Instanz,
+ *  weil `new SecretComponent(...)` tief im Rendern passiert und von außen sonst nicht erreichbar ist. */
+export class SecretComponent {
+  static instances: SecretComponent[] = [];
+  settingKey = "";
+  disabled = false;
+  private changeCallback: ((id: string | null) => unknown) | null = null;
+  constructor(public app: unknown, public containerEl: unknown) { SecretComponent.instances.push(this); }
+  setValue(id: string | null): this { this.settingKey = id ?? ""; return this; }
+  onChange(cb: (id: string | null) => unknown): this { this.changeCallback = cb; return this; }
+  setDisabled(d: boolean): this { this.disabled = d; return this; }
+  /** Testhilfe (nicht in Obsidian): der Nutzer wählt im Schlüsselbund-Dialog einen Eintrag, oder löst per X (`null`). */
+  choose(id: string | null): void { this.setValue(id); this.changeCallback?.(id); }
+}
+
+/** Desktop-Adapter des Vaults (health-vitals, vault-rag, Welle 19): Plugins prüfen `adapter instanceof FileSystemAdapter`, bevor sie
+ *  `getBasePath()` lesen. `makeFakeApp().vault.adapter` ist KEINE Instanz davon (bestehende Tests hängen daran); wer den Desktop-Pfad
+ *  testet, setzt `app.vault.adapter = new FileSystemAdapter("/vault")`. */
+export class FileSystemAdapter {
+  constructor(private basePath = "/fake") {}
+  getBasePath(): string { return this.basePath; }
+}
 export function normalizePath(path: string): string {
   const out = String(path)
     .replace(/\\/g, "/")
@@ -788,6 +857,12 @@ export const requestUrl: MockFn = fn((..._args: any[]) => Promise.resolve({
 // ---------------------------------------------------------------------------
 // Fake App (image-to-markdown / vault-rag superset; spies via internal `fn`).
 // ---------------------------------------------------------------------------
+/** `CSSStyleSheet` gibt es in der Node-Umgebung nicht — der Stub hält den zuletzt gesetzten Text (vault-crews, Welle 19). */
+export class MockSheet {
+  css = "";
+  replaceSync(css: string): void { this.css = css; }
+}
+
 export function makeFakeApp(): any {
   // Der Workspace haelt eine Selbstreferenz, damit `iterateAllLeaves` ueber die vom Test
   // registrierten Leaves laufen kann (`workspace.__leaves`).
@@ -837,7 +912,9 @@ export function makeFakeApp(): any {
       getLeaf: fn().mockReturnValue(new WorkspaceLeaf()),
       // Die drei Wurzeln, an denen `WorkspaceLeaf.getRoot()` endet. Eigene Marker-Objekte,
       // damit ein Test sie unterscheiden kann — im Mock haengt kein Baum daran.
-      rootSplit: { __split: "root" },
+      // `doc`: das Dokument des Hauptfensters, wie `installFolderHide` es liest (`adoptedStyleSheets`, `defaultView.CSSStyleSheet`).
+      // Je App neu gebaut, damit kein Test das Array des nächsten sieht.
+      rootSplit: { __split: "root", doc: { adoptedStyleSheets: [] as any[], defaultView: { CSSStyleSheet: MockSheet } } },
       leftSplit: { __split: "left" },
       rightSplit: { __split: "right" },
       /** Vom Test registrierte Leaves; Grundlage von `iterateAllLeaves`. */
@@ -947,6 +1024,10 @@ export const defaultStubs = {
   Scope,
   AbstractInputSuggest,
   FuzzySuggestModal,
+  SuggestModal,
+  SecretComponent,
+  FileSystemAdapter,
+  getFrontMatterInfo,
   Menu,
   MenuItem,
   TextComponent,

@@ -175,6 +175,8 @@ async function main(): Promise<void> {
   const only = flag("only");
   const outDir = flag("out") ?? "docs/images";
   const explore = args.includes("--explore");
+  // `--breite <px>`: schmaleres Fenster, Bild heisst dann `endpoints-<px>.png` (Beleg fuer die Aktionsknoepfe der Zeile)
+  const breite = flag("breite") !== undefined ? Number(flag("breite")) : undefined;
 
   const ws = await attachTo("workspace", port, REPO_NAME);
   if (!ws) throw new Error(`Kein Obsidian-Fenster fuer Vault „${REPO_NAME}" auf Port ${port}`);
@@ -195,7 +197,7 @@ async function main(): Promise<void> {
     await setState(ws);
 
     settingsWin = await openSettings(ws, port);
-    await setWindowSize(settingsWin, WINDOW.width, WINDOW.height);
+    await setWindowSize(settingsWin, breite ?? WINDOW.width, WINDOW.height);
     await new Promise((r) => setTimeout(r, 2500));   // Statusleuchten kommen asynchron
     await pollUntil<string>(settingsWin, `return document.querySelector(".lem-cap") ? "ok" : null;`, 15_000, 250);
 
@@ -220,9 +222,9 @@ async function main(): Promise<void> {
     }
     if (want("endpoints")) {
       const box = await ausschnitt(settingsWin, {
-        scrollTo: "rowOf(1)", von: "rowOf(1)", bis: "[...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Check connections')", width: 712, padBottom: 20,
+        scrollTo: "rowOf(1)", von: "rowOf(1)", bis: "[...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Check connections')", ...(breite === undefined ? { width: 712 } : {}), padBottom: 20,
       });
-      await aufnehmen(settingsWin, "endpoints.png", box, outDir);
+      await aufnehmen(settingsWin, breite === undefined ? "endpoints.png" : `endpoints-${breite}.png`, box, outDir);
     }
     if (want("models")) {
       const box = await ausschnitt(settingsWin, {

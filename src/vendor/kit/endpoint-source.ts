@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.56.0, src/pure/endpoint-source.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.59.0, src/pure/endpoint-source.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 import { hydrateEndpointSecrets, resolveActiveEndpointConfig, type EndpointConfig } from "./endpoint_config";
 import type { SecretStore } from "./secrets";
 import { familyFromName, type BackendId, type FamilyId, type ModelFamilyId } from "./sampling-profiles";
@@ -60,6 +60,27 @@ export function isLlmEndpointManagerApi(x: unknown): x is LlmEndpointManagerApi 
 }
 
 export interface EndpointChoice { endpointId?: string; model?: string }
+
+/** Liest eine gespeicherte Endpunkt-Wahl aus `data.json`: nur nicht-leere Strings in `endpointId` und `model` bleiben, alles andere
+ *  fällt weg. `raw` ist untrusted — die Datei ist von Hand editierbar, und ein unbekanntes Feld (ein Schlüssel, eine URL) soll nie
+ *  zurück in die Datei wandern. Kein Objekt (`null`, `undefined`, String, Zahl) ergibt `{}`; ein Array hat keine dieser Felder, also
+ *  ebenfalls `{}`. Das Ergebnis ist ein neues Objekt, `raw` bleibt unverändert, ein fehlendes Feld steht nicht als `undefined` darin.
+ *
+ *  Getrimmt wird nicht: `" "` ist nicht leer und bleibt (so taten es alle Träger). Gelesen werden nur die zwei benannten Felder, nie
+ *  geerbte (`__proto__` aus einem geparsten JSON zählt nicht).
+ *
+ *  Fünf Plugins schrieben dasselbe (Welle 19, Erhebung a4): vault-crews `src/obsidian/settings.ts:51`, slide-deck `src/settings.ts:53`,
+ *  json-editor `src/core/repair/settings.ts:24`, neurovim-obsidian `src/settings.ts:64`, image-to-markdown `src/resolve_endpoint.ts:8`;
+ *  die Unterschiede (`!== ""` gegen Wahrheitswert, `c.endpointId`) waren Schreibweise ohne Folge für einen String. ghostline
+ *  (`src/core/settings.ts:47`) schreibt dieselbe Regel inline in ein bestehendes Objekt und ist kein Tausch ohne Umbau. */
+export function sanitizeChoice(raw: unknown): EndpointChoice {
+  if (raw === null || typeof raw !== "object") return {};
+  const { endpointId, model } = raw as Record<string, unknown>;
+  return {
+    ...(typeof endpointId === "string" && endpointId !== "" ? { endpointId } : {}),
+    ...(typeof model === "string" && model !== "" ? { model } : {}),
+  };
+}
 export type SourceKind = "manager" | "local";
 export interface EndpointSourceInput {
   manager?: LlmEndpointManagerApi | null;

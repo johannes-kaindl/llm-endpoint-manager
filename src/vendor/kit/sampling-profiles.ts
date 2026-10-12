@@ -1,4 +1,4 @@
-// vendored from code-kit@0.23.0, src/ts/pure/sampling-profiles.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from code-kit@0.24.0, src/ts/pure/sampling-profiles.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 /** Request profiles for local and hosted LLM backends: which sampling values, which
  *  reasoning_effort and which minimum token budget a plugin sends, per model family × mode,
  *  and which of those fields a backend actually honours.

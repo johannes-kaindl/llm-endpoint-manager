@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.56.0, src/obsidian/endpoint-list.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.59.0, src/obsidian/endpoint-list.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 /* Geordneter Endpunkt-Fallback-Listen-Editor: eine Setting-Zeile je Endpunkt (URL ·
  * Schlüssel · Modell-Override · „zuerst verwenden" · entfernen) plus Adder-Zeile,
  * Status-Icon, Rollenzeile, Drittanbieter-Hinweis und Preset-Knöpfe.
@@ -95,6 +95,10 @@ export interface EndpointListOptions<T extends EndpointConfig = EndpointConfig> 
   /** Nur Embedding-Listen: passt das (Override-)Modell dieser Zeile zum geladenen Index?
    *  Fehlt der Callback (Chat-Liste), gilt true — dort hängt kein Index am Modell. */
   modelFits?(cfg: T): boolean;
+  /** Bietet das Modell-Dropdown einer Zeile die Leer-Option „Server wählt“ an? Default `true` (Chat-Listen: ohne Modell wählt der
+   *  Server). Embedding-Listen setzen `false`: ein Index braucht ein benanntes Modell, eine Zeile ohne Modell zeigt dort nur den
+   *  Platzhalter „—“ und sie verschwindet, sobald ein Modell gewählt ist. */
+  allowEmptyModel?: boolean;
   /** Optional: Kontextlänge des Zeilen-Modells. Gerufen wird `load` **nach** der Status-Probe, nur für eine erreichbare
    *  Zeile mit gesetztem Modell; liefert er `null` oder nichts Messbares, bleibt die Zeile ohne Kontextzeile.
    *  `invalidate` läuft beim Knopf „Modelle neu laden“. Braucht `strings.contextText`. */
@@ -339,7 +343,7 @@ export function buildEndpointList<T extends EndpointConfig = EndpointConfig>(opt
         // Das Zeilen-Modell ist die einzige Wahrheit (kein globales Modell-Feld seit 0.55.0). Die Leer-Option
         // bleibt trotzdem: sie heißt nicht „nimm das globale“, sondern „der Server wählt“ — sonst ließe sich ein
         // gewähltes Zeilen-Modell in der Oberfläche nicht mehr zurücknehmen.
-        const resolved = resolveModelChoice({ reachable, models, current: cfg.model ?? "", allowEmpty: true });
+        const resolved = resolveModelChoice({ reachable, models, current: cfg.model ?? "", allowEmpty: opts.allowEmptyModel ?? true });
         const emptyLabel = opts.strings.emptyModel ?? "—";
         const choice = { ...resolved, options: resolved.options.map((o) => (o.value === "" && o.label === "" ? { ...o, label: emptyLabel } : o)) };
         renderModelPicker({
@@ -357,12 +361,20 @@ export function buildEndpointList<T extends EndpointConfig = EndpointConfig>(opt
         });
       });
     }
+    // „Zuerst verwenden“ und Löschen sitzen in EINEM Container (`okit-ep-actions`): ein Flex-Wrap
+    // bricht einzelne Kinder um, den Container nur als Ganzes — sonst steht der Mülleimer allein
+    // in Zeile zwei, sobald die Felder die Breite füllen (gemessen 2026-09-27, 900 px, vault-rag
+    // und vault-crews). `addExtraButton` hängt ans Ende von controlEl, der Knopf wird umgehängt.
+    const actionsEl = isAdder ? null : s.controlEl.createDiv({ cls: "okit-ep-actions" });
+    const addAction = (build: Parameters<Setting["addExtraButton"]>[0]): void => {
+      s.addExtraButton(b => { actionsEl?.appendChild(b.extraSettingsEl); build(b); });
+    };
     // „Zuerst verwenden": setzt die Zeile an die Spitze der Prioritätsliste. An Platz 1
     // bewusst GAR NICHT gezeichnet statt deaktiviert — ein setDisabled-Element trägt seinen
     // Tooltip in Electron unsichtbar (Befund aus dem Modell-Picker-Review 2026-08-05), der
     // Knopf wäre dort also stumm UND wirkungslos.
     if (!isAdder && i > 0) {
-      s.addExtraButton(b => b
+      addAction(b => b
         .setIcon("arrow-up-to-line")
         .setTooltip(opts.strings.moveToFront)
         .onClick(() => {
@@ -377,7 +389,7 @@ export function buildEndpointList<T extends EndpointConfig = EndpointConfig>(opt
     // Löschen: expliziter Mülleimer-Button (nicht am leeren Add-Feld). Das Status-Icon links
     // ist nur Erreichbarkeits-Anzeige, kein Lösch-Button.
     if (!isAdder) {
-      s.addExtraButton(b => b
+      addAction(b => b
         .setIcon("trash-2")
         .setTooltip(opts.strings.remove)
         .onClick(() => {
@@ -550,6 +562,25 @@ export const ENDPOINT_LIST_CSS = `
   flex: 1 1 12em;
   min-width: 8em;
 }
+.okit-ep-row > .setting-item-control input[type="password"] {
+  flex-basis: 8em;
+  min-width: 6em;
+}
+/* Aktionsknöpfe (nach oben, Papierkorb) als ein Block: die Felder dürfen umbrechen, die Knöpfe
+   bleiben zusammen und behalten ihre Größe. Bricht der Block um, steht er rechtsbündig
+   (margin-left: auto), wie die umbrechende Modellzeile. Die Adresse behält ihre Basis von 12em —
+   eine abgeschnittene Adresse liest sich wie ein anderer Port; kleiner sind nur Schlüsselfeld
+   (8em) und Modell-Platz (8em, wächst mit dem freien Platz). */
+.okit-ep-row > .setting-item-control > .okit-ep-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-1);
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+.okit-ep-row > .setting-item-control > .okit-ep-actions > .clickable-icon {
+  flex: 0 0 auto;
+}
 /* Reservierter Platz für das Modell-Dropdown (Auffüllen der Zeile erst nach dem geladenen
    Promise, siehe buildEndpointList). Selbst ein Flex-Container, damit Dropdown/Freitext + der
    „Modelle abrufen"-Knopf innerhalb genauso mitwachsen wie URL/Schlüssel daneben. */
@@ -557,8 +588,8 @@ export const ENDPOINT_LIST_CSS = `
   display: flex;
   align-items: center;
   gap: var(--size-4-1);
-  flex: 1 1 12em;
-  min-width: 10em;
+  flex: 1 1 8em;
+  min-width: 8em;
 }
 .okit-ep-row > .setting-item-control .okit-model-slot select,
 .okit-ep-row > .setting-item-control .okit-model-slot input[type="text"] {
