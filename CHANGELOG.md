@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-10-12
+
 ### Changed
 
 - Settings, endpoint list: the "move to top" and "remove endpoint" buttons stay together in one row instead of the bin icon sitting alone on a second line. The address and the model ID stay fully visible at normal window width (a very long ID gets a row of its own); in a narrow window the block of model and buttons moves to a second line as a whole, aligned to the right. Only the empty key field shows a shorter placeholder. This plugin's own stylesheet carries the same copy of the kit rules.
