@@ -25,7 +25,6 @@
  * (Dach-AGENTS.md, README-Bilder: ein Rezept maskiert in der Darstellung, nicht im Speicher).
  */
 
-import { execFileSync } from "node:child_process";
 import { createServer, type Server } from "node:http";
 import { argv, cwd, exit } from "node:process";
 
@@ -206,10 +205,6 @@ async function main(): Promise<void> {
   const fakes: Fake[] = [];
   let settingsWin: Cdp | null = null;
   try {
-    if (process.platform === "darwin") {
-      try { execFileSync("osascript", ["-e", 'tell application "Obsidian" to activate']); await new Promise((r) => setTimeout(r, 1200)); }
-      catch { console.log("  (Hinweis: osascript activate schlug fehl)"); }
-    }
     await requireVisible(ws);
 
     // Aufnahmesprache: Englisch (README.md ist kanonisch). Die Pruefung liest die Sprache aus

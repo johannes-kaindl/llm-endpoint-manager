@@ -33,7 +33,6 @@
  * Typen: `tsconfig.scripts.json` (im `gate` ueber `npm run typecheck:scripts`).
  */
 import { createServer, type Server } from "node:http";
-import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { cwd } from "node:process";
@@ -258,12 +257,6 @@ async function main(): Promise<void> {
   process.on("SIGTERM", onAbortSignal);
 
   try {
-    if (process.platform === "darwin") {
-      try {
-        execFileSync("osascript", ["-e", 'tell application "Obsidian" to activate']);
-        await new Promise((r) => setTimeout(r, 1500));
-      } catch { console.log("  (Hinweis: osascript activate schlug fehl — Fenster ggf. von Hand nach vorn holen)"); }
-    }
     await requireVisible(cdp);
 
     const vaultInfo = await cdp.evaluate<{ name: string; basePath: string; configDir: string }>(`
