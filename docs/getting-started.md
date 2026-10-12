@@ -1,6 +1,6 @@
 # Getting started
 
-This walk-through takes you from installing LLM Endpoint Manager to a first endpoint that shows **Reachable**, with a token stored in the keychain. It takes about five minutes and needs a model server you can reach — for example [LM Studio](https://lmstudio.ai) on the same machine (the [local LLM setup guide](https://uplink.jkaindl.de/llm-setup) covers installing one).
+This walk-through takes you from installing LLM Endpoint Manager to a first endpoint that shows **Connected**, with a token stored in the keychain. It takes about five minutes and needs a model server you can reach — for example [LM Studio](https://lmstudio.ai) on the same machine (the [local LLM setup guide](https://uplink.jkaindl.de/llm-setup) covers installing one).
 
 ## 1. Install and enable
 
@@ -18,7 +18,7 @@ Have another server? Type its address into the empty field **Add an endpoint: ht
 
 ## 3. Read the status
 
-Every row has a status indicator next to its address. Hover it to read the result: **Reachable** means the server answered like a model API. Anything else names the reason, for example **Connection refused — is the server running?** — see [Troubleshooting](troubleshooting.md).
+Every row has a status indicator next to its address. Hover it to read the result: **Connected** means the server answered like a model API. Anything else names the reason, for example **Connection refused — server not running or wrong port.** — see [Troubleshooting](troubleshooting.md).
 
 Click **Check connections** to test all rows again.
 

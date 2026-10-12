@@ -5,6 +5,7 @@ import LlmEndpointManagerPlugin from "../src/main";
 import { helpSettingDefinition } from "../src/vendor/kit-obsidian/help-setting";
 import { LlmEndpointManagerSettingTab, helpOptions, presetText } from "../src/obsidian/settings-tab";
 import { setLang } from "../src/vendor/kit/i18n";
+import { ENDPOINT_STATUS_TEXTS_DE, ENDPOINT_STATUS_TEXTS_EN } from "../src/vendor/kit-obsidian/endpoint-status-text";
 
 // Testumgebung ist "node" (kein jsdom, siehe vitest.config.ts) — die Endpunkt-Liste probt beim
 // Rendern jede Zeile über src/obsidian/http.ts, das window.setTimeout/clearTimeout braucht
@@ -43,6 +44,36 @@ describe("presetText", () => {
     setLang("en");
     expect(presetText({ label: "OpenAI-compatible cloud" })).toBe("OpenAI-compatible cloud");
     expect(presetText({ label: "Apple Intelligence (on-device)" })).toBe("Apple Intelligence (on-device)");
+  });
+});
+
+describe("Status- und Hinweistexte der Endpunkt-Zeile", () => {
+  it("kommen aus dem Kit (endpoint-status-text), in beiden Sprachen", async () => {
+    const { tab: t } = await tab({ endpoints: [] });
+    const strings = (t as unknown as { endpointStrings(): { statusTooltip(s: { kind: string; raw?: string }): string; warnings(w: { rule: string; message: string }[]): string } }).endpointStrings();
+    setLang("en");
+    expect(strings.statusTooltip({ kind: "ok" })).toBe(ENDPOINT_STATUS_TEXTS_EN.kinds.ok);
+    expect(strings.statusTooltip({ kind: "unknown", raw: "boom" })).toBe("Not reachable — boom");
+    expect(strings.warnings([{ rule: "port", message: "x" }])).toBe(ENDPOINT_STATUS_TEXTS_EN.warnings.port);
+    setLang("de");
+    expect(strings.statusTooltip({ kind: "timeout" })).toBe(ENDPOINT_STATUS_TEXTS_DE.kinds.timeout);
+    expect(strings.warnings([{ rule: "scheme", message: "x" }, { rule: "gibts-nicht", message: "Eigene Meldung" }])).toBe(`${ENDPOINT_STATUS_TEXTS_DE.warnings.scheme} · Eigene Meldung`);
+    setLang("en");
+  });
+  it("Kontextlänge und Leer-Option tragen den Kit-Wortlaut in beiden Sprachen", async () => {
+    const { tab: t } = await tab({ endpoints: [] });
+    type S = { emptyModel?: string; contextText?(c: { loadedContextLength?: number; maxContextLength?: number }): string };
+    const build = (): S => (t as unknown as { endpointStrings(): S }).endpointStrings();
+    setLang("en");
+    const strings = build();
+    expect(strings.emptyModel).toBe("— (server picks)");
+    expect(strings.contextText?.({ loadedContextLength: 65536, maxContextLength: 262144 })).toBe("Context: loaded 65,536 · max 262,144 tokens");
+    expect(strings.contextText?.({ maxContextLength: 8192 })).toBe("Context: max 8,192 tokens");
+    setLang("de");
+    const de = build();
+    expect(de.emptyModel).toBe("— (Server wählt)");
+    expect(de.contextText?.({ loadedContextLength: 4096 })).toBe("Kontext: geladen 4.096 Token");
+    setLang("en");
   });
 });
 

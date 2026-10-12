@@ -1,11 +1,11 @@
 import { App, Notice, PluginSettingTab, Setting, type ButtonComponent, type SettingDefinitionItem } from "obsidian";
 import type LlmEndpointManagerPlugin from "../main";
-import { t } from "../vendor/kit/i18n";
+import { getLang, t } from "../vendor/kit/i18n";
 import { renderSettingDefinitions, settingBodyHost, refreshSettingsTab } from "../vendor/kit-obsidian/settings_walker";
 import { githubHelpUrls, helpSettingDefinition, type HelpSettingOptions } from "../vendor/kit-obsidian/help-setting";
 import { buildEndpointList, type EndpointListStrings, type EndpointSecretHook } from "../vendor/kit-obsidian/endpoint-list";
 import { createModelListCache, type ModelListCache } from "../vendor/kit/model-list-cache";
-import type { EndpointStatusKind } from "../vendor/kit/endpoint_diagnostics";
+import { endpointStatusText, endpointWarningText } from "../vendor/kit-obsidian/endpoint-status-text";
 import { authHeaders, type EndpointRole } from "../vendor/kit/endpoint_config";
 import { normalizeEndpoint } from "../vendor/kit/endpoint";
 import { BACKEND_IDS, BACKENDS, FAMILIES, FAMILY_IDS, MODEL_FAMILIES, type BackendId, type FamilyId } from "../vendor/kit/sampling-profiles";
@@ -13,18 +13,11 @@ import { probeBaseUrl, probeEndpoint } from "../vendor/kit/capabilities";
 import { CAPABILITIES, PROVIDERS, DEFAULT_SHORTCUT_NAME, DEFAULT_SHORTCUT_TIMEOUT_MS, labelFromUrl, newId, type ManagedEndpoint, type Provider } from "../core/model";
 import { modelRows, setModelMeta, type ModelRow } from "../core/model-rows";
 import { PRESETS } from "../core/provider";
-import { clientFor, capabilityFetch } from "./http";
+import { clientFor, capabilityFetch, loadModelContext } from "./http";
+import type { ModelContext } from "../vendor/kit/model-context";
 
 type ItemDef = { name?: string; desc?: string; render?: (setting: Setting) => void };
 type GroupDef = { type?: string; heading?: string; items?: ItemDef[] };
-
-const STATUS_KEY: Record<Exclude<EndpointStatusKind, "unknown">, string> = {
-  "ok": "ep.status.ok", "refused": "ep.status.refused", "unknown-host": "ep.status.unknownHost",
-  "timeout": "ep.status.timeout", "not-an-llm-api": "ep.status.notAnLlmApi", "unauthorized": "ep.status.unauthorized",
-};
-const WARN_KEY: Record<string, string> = {
-  "scheme": "ep.warn.scheme", "malformed": "ep.warn.malformed", "port": "ep.warn.port", "placeholder-ip": "ep.warn.placeholderIp",
-};
 
 /** Anzeigename eines Presets in der gewählten Sprache: der Kit-Editor reicht nur `{label, url}` durch, die
  *  Übersetzung hängt deshalb am kanonischen `label` (Marken ohne `labelKey` bleiben stehen). */
@@ -44,6 +37,9 @@ export function helpOptions(open?: (url: string) => void): HelpSettingOptions {
 
 export class LlmEndpointManagerSettingTab extends PluginSettingTab {
   private modelLists: ModelListCache = createModelListCache();
+  /** Kontextlänge je (URL, Modell): die Zeile zeichnet sich bei jeder Änderung neu, ohne Zwischenspeicher
+   *  ginge jedes Mal eine Anfrage an den Server. „Modelle neu laden" leert den Eintrag der URL. */
+  private contextCache = new Map<string, Promise<ModelContext | null>>();
   private cleanupPrevious: () => void = () => {};
 
   constructor(app: App, readonly plugin: LlmEndpointManagerPlugin) {
@@ -75,6 +71,7 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
   }
 
   hide(): void {
+    this.contextCache.clear();
     this.modelLists.clear();   // Kit-Vertrag: sonst bleibt „nicht erreichbar" für die Sitzung stehen
   }
 
@@ -100,12 +97,17 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
       modelHint: (key) => (key === "unreachable" ? t("ep.hint.unreachable") : key === "no-list" ? t("ep.hint.noList") : ""),
       savedSuffix: t("ep.saved"), refreshModels: t("ep.refreshModels"), moveToFront: t("ep.moveToFront"),
       remove: t("ep.remove"), thirdParty: t("ep.thirdParty"), probing: t("ep.probing"),
-      statusTooltip: (status) => (status.kind === "unknown" ? t("ep.status.unknown", status.raw ?? "") : t(STATUS_KEY[status.kind])),
+      statusTooltip: (status) => endpointStatusText(status.kind, { lang: getLang(), ...(status.raw !== undefined ? { raw: status.raw } : {}) }),
       role: (role: EndpointRole) => role.kind === "active" ? t("ep.role.active")
         : role.kind === "standby" ? t("ep.role.standby", String(role.position))
         : role.kind === "unreachable" ? t("ep.role.unreachable") : t("ep.role.skippedModel"),
-      warnings: (ws) => ws.map((w) => (WARN_KEY[w.rule] ? t(WARN_KEY[w.rule]) : w.message)).join(" · "),
+      warnings: (ws) => ws.map((w) => endpointWarningText(w.rule, { lang: getLang(), fallback: w.message })).join(" · "),
       presetTooltip: (p) => t("ep.preset", presetText(p)), presetLabel: (p) => presetText(p),
+      emptyModel: t("ep.emptyModel"),
+      contextText: (c) => c.loadedContextLength !== undefined && c.maxContextLength !== undefined
+        ? t("ep.context.loaded", c.loadedContextLength.toLocaleString(getLang()), c.maxContextLength.toLocaleString(getLang()))
+        : c.loadedContextLength !== undefined ? t("ep.context.loadedOnly", c.loadedContextLength.toLocaleString(getLang()))
+        : t("ep.context.max", (c.maxContextLength ?? 0).toLocaleString(getLang())),
       checkConnection: t("ep.checkConnection"), saveFailed: t("ep.saveFailed"),
       secretSaved: t("ep.secretSaved"), secretChange: t("ep.secretChange"), secretClear: t("ep.secretClear"), secretUnavailable: t("ep.secretUnavailable"),
     };
@@ -165,6 +167,18 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
       rerender: () => { this.refreshUi(); },
       presets: PRESETS.map((p) => ({ label: p.label, url: p.url })),
       secret: this.secretHook(),
+      modelContext: {
+        load: (cfg) => {
+          const key = `${normalizeEndpoint(cfg.url)}\n${cfg.model?.trim() ?? ""}`;
+          let hit = this.contextCache.get(key);
+          if (!hit) { hit = loadModelContext(this.withToken(cfg), cfg.provider ?? "openai"); this.contextCache.set(key, hit); }
+          return hit;
+        },
+        invalidate: (cfg) => {
+          const prefix = `${normalizeEndpoint(cfg.url)}\n`;
+          for (const k of [...this.contextCache.keys()]) if (k.startsWith(prefix)) this.contextCache.delete(k);
+        },
+      },
       extraRow: (host, cfg) => { this.renderExtra(host, cfg); },
     });
   }

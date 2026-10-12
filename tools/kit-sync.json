@@ -7,7 +7,7 @@
     },
     {
       "dir": "src/vendor/kit", "source": "code-kit", "from": "src/ts/pure",
-      "modules": ["endpoint", "endpoint_config", "endpoint_diagnostics", "model-choice", "model-list-cache", "timeout", "i18n", "settings", "reasoning", "capabilities", "sampling-profiles", "think-splitter", "secrets"]
+      "modules": ["endpoint", "endpoint_config", "endpoint_diagnostics", "model-choice", "model-list-cache", "timeout", "i18n", "settings", "reasoning", "capabilities", "sampling-profiles", "think-splitter", "secrets", "model-context"]
     },
     {
       "dir": "src/vendor/kit-obsidian", "source": "obsidian-kit", "from": "src/obsidian",

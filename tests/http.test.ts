@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, beforeAll, afterAll } from "vitest";
 import { requestUrl } from "obsidian";
-import { listModels, probeStatus } from "../src/obsidian/http";
+import { listModels, loadModelContext, probeStatus } from "../src/obsidian/http";
 import { classifyEndpointStatus } from "../src/vendor/kit/endpoint_diagnostics";
 
 // Der vendorte Obsidian-Mock (tests/vendor/kit/obsidian-mock.ts) baut `requestUrl` mit einem
@@ -85,5 +85,24 @@ describe("probeStatus/listModels", () => {
     const comfy = await probeStatus({ url: "http://h:8188" }, "comfy", 100);
     expect(a1111.klartext).toBe(referenz.klartext);
     expect(comfy.klartext).toBe(referenz.klartext);
+  });
+});
+
+describe("loadModelContext", () => {
+  it("LM Studio: fragt /api/v0/models mit dem Schlüssel der Zeile und liefert geladen/max", async () => {
+    rq.mockResolvedValue({ status: 200, text: JSON.stringify({ data: [{ id: "m", loaded_context_length: 65536, max_context_length: 262144 }] }) });
+    const ctx = await loadModelContext({ url: "http://h:1234/v1", apiKey: "tok", model: "m" }, "openai");
+    expect(ctx).toEqual({ loadedContextLength: 65536, maxContextLength: 262144 });
+    expect(lastCallArg()).toEqual(expect.objectContaining({ url: "http://h:1234/api/v0/models", headers: { Authorization: "Bearer tok" } }));
+  });
+  it("ohne Modell, bei a1111/comfy/apple-shortcuts: null und KEINE Anfrage", async () => {
+    rq.mockClear();
+    expect(await loadModelContext({ url: "http://h:1234" }, "openai")).toBeNull();
+    for (const p of ["a1111", "comfy", "apple-shortcuts"] as const) expect(await loadModelContext({ url: "http://h", model: "m" }, p)).toBeNull();
+    expect(rq.mock.calls.length).toBe(0);
+  });
+  it("Server nennt keine Zahl oder antwortet nicht: null, kein Wurf", async () => {
+    rq.mockRejectedValue(new Error("ECONNREFUSED"));
+    expect(await loadModelContext({ url: "http://h:1234", model: "m" }, "openai")).toBeNull();
   });
 });

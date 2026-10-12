@@ -4,23 +4,23 @@ Each entry gives the message as it appears in the settings tab (English interfac
 
 ## An endpoint is not reachable
 
-### "Connection refused — is the server running?"
+### "Connection refused — server not running or wrong port."
 
 **Cause:** nothing listens on that address and port. **What to do:** start the server (for LM Studio: turn on the local server, default port 1234; Ollama: port 11434) and click **Check connections**. Check the port in the address.
 
-### "Host not found"
+### "Unknown host — typo in the address?"
 
 **Cause:** the host name does not resolve. **What to do:** check for typos; on the same machine use `localhost`; for another machine use its IP address or a name your system can resolve.
 
-### "No answer within the time limit"
+### "Timeout — network unreachable (wrong network / VPN off?)."
 
 **Cause:** the server or a firewall does not answer in time — often a wrong IP or a sleeping machine. **What to do:** open the address in a browser, wake the server, allow the port in the firewall, then **Check connections**.
 
-### "Answers, but not like a model API"
+### "Responds, but is not an OpenAI-compatible endpoint — wrong path/service?"
 
 **Cause:** something answers, but not with a model list at the expected path (any answer other than a model list, and other than 401/403, lands here). Typical: the address points at a web page, a reverse proxy without the API path, or carries a path beyond the base (for example `…/v1/chat/completions`). **What to do:** enter the base address only — `http://host:1234`. A trailing `/v1` is fine, the plugin strips it; anything deeper is not stripped. For image protocols check that the row's **Protocol** matches the server (**Automatic1111 (image)**, **ComfyUI (image)**). The [local LLM setup guide](https://uplink.jkaindl.de/llm-setup) explains the right address per server.
 
-### "Rejected: token missing or wrong"
+### "Access denied — API key missing or invalid."
 
 **Cause:** the server answered 401 or 403 — it demands an API token and got none or a wrong one. **What to do:** paste the token into **API token (optional)** on the row (see below if the field is locked). If the row says **A token is referenced but not in the keychain — enter it again.**, the keychain entry is gone (for example on a new device) — enter the token again.
 
@@ -30,7 +30,7 @@ Each entry gives the message as it appears in the settings tab (English interfac
 
 ### A warning under the address
 
-These messages point at a typo and never block saving: **Address should start with http:// or https://** (a scheme is missing), **Address looks malformed** (the text is not a valid URL — also what the empty **OpenAI-compatible cloud** preset, which starts as just `https://`, shows until you complete it with your provider's address), **Port looks unusual** (a local `http://` address without a port such as `:1234`) and **Placeholder address — replace it** (`0.0.0.0` or an example address from the documentation ranges).
+These messages point at a typo and never block saving: **Address needs http:// or https://** (a scheme is missing), **Address is not a valid URL** (the text is not a valid URL — also what the empty **OpenAI-compatible cloud** preset, which starts as just `https://`, shows until you complete it with your provider's address), **Local LLM servers almost always need a port (e.g. :1234)** (a local `http://` address without a port such as `:1234`) and **Looks like an example or placeholder address** (`0.0.0.0` or an example address from the documentation ranges).
 
 ## The Apple Intelligence (on-device) endpoint
 
@@ -78,7 +78,7 @@ Not an error: a reminder. A token usually means a hosted service, so what plugin
 
 ### A plugin says it found no endpoint
 
-**Cause:** no enabled, reachable endpoint offers the capability the plugin asked for. **What to do:** on the row, switch on the capability (**Capabilities**), make sure **Enabled** is on and the status is **Reachable**. Plugins built on the shared endpoint source use their own endpoint list only when the manager is not installed or disabled; once the manager is active, it alone decides.
+**Cause:** no enabled, reachable endpoint offers the capability the plugin asked for. **What to do:** on the row, switch on the capability (**Capabilities**), make sure **Enabled** is on and the status is **Connected**. Plugins built on the shared endpoint source use their own endpoint list only when the manager is not installed or disabled; once the manager is active, it alone decides.
 
 ### The manager is disabled or missing
 

@@ -36,6 +36,13 @@
 }
 /* Speicher-/Lösch-Fenster: die gerenderten Zeilen-Indizes sind stale, bis der Re-Render kommt —
    Eingaben und Icon-Buttons (divs, kein disabled) sind solange gesperrt. */
+/* Kontextlänge des Zeilen-Modells: eigene Zeile unter der Rolle, nur wenn der Server die Zahl nennt. */
+.okit-ep-row > .setting-item-control .okit-ep-context {
+  flex: 0 0 100%;
+  order: 2;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
 .okit-ep-busy { pointer-events: none; opacity: 0.6; }
 /* Endpunkt-Zeile: drei Felder (Adresse · Schlüssel · Modell) brauchen die volle Breite.
    Die Beschriftung steht als eigene Zeile darüber, deshalb ist der Info-Block hier leer und

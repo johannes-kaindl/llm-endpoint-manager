@@ -5,6 +5,7 @@ import { normalizeEndpoint } from "../vendor/kit/endpoint";
 import { authHeaders, type EndpointConfig } from "../vendor/kit/endpoint_config";
 import { withTimeout } from "../vendor/kit/timeout";
 import type { CapabilityFetch } from "../vendor/kit/capabilities";
+import { fetchModelContext, type ModelContext } from "../vendor/kit/model-context";
 import { providerProbe } from "../core/provider";
 import type { Provider } from "../core/model";
 
@@ -101,4 +102,14 @@ export async function listModels(cfg: EndpointConfig, provider: Provider, timeou
 /** EIN Client je Zeile für den Kit-Listen-Editor (Status-Icon UND Modell-Liste). */
 export function clientFor(cfg: EndpointConfig, provider: Provider): { probe(): Promise<EndpointStatus>; listModels(): Promise<string[]> } {
   return { probe: () => probeStatus(cfg, provider), listModels: () => listModels(cfg, provider) };
+}
+
+/** Kontextlänge des Zeilen-Modells (Kit `fetchModelContext`: LM Studio, dann Ollama; wirft nie, `null` =
+ *  der Server nennt keine Zahl). Nur für HTTP-Zeilen, die ein Chat-Modell tragen können: Kurzbefehl-,
+ *  A1111- und ComfyUI-Zeilen haben keinen Kontext-Endpunkt und bekommen keine Anfrage. Der Schlüssel der
+ *  Zeile geht mit, sonst bleibt ein geschützter Server still bei `null`. */
+export function loadModelContext(cfg: EndpointConfig, provider: Provider): Promise<ModelContext | null> {
+  if (provider !== "openai" && provider !== "ollama") return Promise.resolve(null);
+  const auth = authHeaders(cfg.apiKey);
+  return fetchModelContext((req) => capabilityFetch({ ...req, headers: { ...auth, ...(req.headers ?? {}) } }), normalizeEndpoint(cfg.url), cfg.model?.trim() ?? "", { timers: window });
 }

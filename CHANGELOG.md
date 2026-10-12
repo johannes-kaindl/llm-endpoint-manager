@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- A reachable endpoint row that has a model now shows the model's context length under the role line: "Context: loaded 65,536 · max 262,144 tokens" (only "max …" when the model is not loaded; nothing when the server does not report a number). LM Studio is asked first, then Ollama; the row's token goes with the request, each attempt gives up after 5 seconds, and "Reload models" asks again. Apple Intelligence, Automatic1111 and ComfyUI rows are never asked.
+- The model dropdown of an endpoint row offers "— (server picks)" ("— (Server wählt)") again. Choosing it removes the model from the row, so the server answers with whatever it has loaded.
+
+### Changed
+
+- The status tooltips and the address hints under an endpoint row now read as in every other plugin built on the shared kit (EN and DE). Status: "Reachable" is now "Connected"; "Connection refused — is the server running?" is "Connection refused — server not running or wrong port."; "Host not found" is "Unknown host — typo in the address?"; "No answer within the time limit" is "Timeout — network unreachable (wrong network / VPN off?)."; "Answers, but not like a model API" is "Responds, but is not an OpenAI-compatible endpoint — wrong path/service?"; "Rejected: token missing or wrong" is "Access denied — API key missing or invalid."; an unknown failure reads "Not reachable — …" with the raw reason. Hints: "Address needs http:// or https://", "Address is not a valid URL", "Local LLM servers almost always need a port (e.g. :1234)", "Looks like an example or placeholder address". Troubleshooting and the getting-started guide quote the new wording. The plugin's own tables are gone.
+- Kit pins raised to `obsidian-kit` 0.56.0 and `code-kit` 0.23.0 (from 0.46.0 and 0.9.0). The plugin API stays at version 1 and answers as before (17 API tests and the list/resolve smoke points unchanged). Of the skipped kit releases, these reach this plugin: the model dropdown, the status wording and the context line above (obsidian-kit 0.52.0, 0.56.0); `<think>` blocks are cut out in linear time in the sampling-profile response check (code-kit 0.22.0, no visible effect here, the manager sends no requests); the keychain helpers `secrets` moved from obsidian-kit to code-kit (0.15.0, same behaviour). The key-redaction rules (code-kit 0.18.0/0.21.0), the remote-source guard and the removal of the global model field (obsidian-kit 0.55.0) concern parts of the kit this plugin does not vendor.
+
 ## [0.5.1] — 2026-10-03
 
 ### Changed
