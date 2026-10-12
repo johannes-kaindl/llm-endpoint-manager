@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.46.0, src/testing/obsidian-mock.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.56.0, src/testing/obsidian-mock.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 // Self-contained Obsidian test double for obsidian-kit.
 // - Zero external imports (NOT from "obsidian", NOT from "vitest").
 // - Consumed via vitest `resolve.alias` as a drop-in for `import ... from "obsidian"`,
@@ -883,6 +883,20 @@ export class App {
 // ---------------------------------------------------------------------------
 // Type-only exports (no runtime stub; not part of MockStubs).
 // ---------------------------------------------------------------------------
+/** Lebensdauer-Anker für `MarkdownRenderer.render`; im Mock ohne Wirkung. */
+export class Component {
+  load(): void {}
+  unload(): void {}
+}
+
+/** `render` schreibt den Markdown als Text ins Element (kein Parser im Mock); Tests ersetzen `render`. */
+export const MarkdownRenderer = {
+  render: ((_app: unknown, markdown: string, el: any, _sourcePath: string, _component: unknown): Promise<void> => {
+    el.textContent = markdown;
+    return Promise.resolve();
+  }) as (app: unknown, markdown: string, el: any, sourcePath: string, component: unknown) => Promise<void>,
+};
+
 export interface PluginManifest {
   id: string;
   name: string;

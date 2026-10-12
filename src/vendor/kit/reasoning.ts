@@ -1,4 +1,4 @@
-// vendored from code-kit@0.9.0, src/ts/pure/reasoning.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from code-kit@0.23.0, src/ts/pure/reasoning.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 export type ThinkingSupport = "none" | "hybrid" | "always";
 
 /** Legacy union params for switching reasoning off; empty object when not suppressing.
@@ -18,15 +18,23 @@ export function suppressParams(suppress: boolean): Record<string, unknown> {
   };
 }
 
-const THINK_TAG = /<think>([\s\S]*?)<\/think>/;
+const THINK_OPEN = "<think>";
+const THINK_CLOSE = "</think>";
 
 /** Hat das Modell real gedacht? (separates reasoning-Feld ODER inline <think> mit Inhalt).
- *  Dient dazu, „Suppress hat nicht gegriffen" ehrlich zu erkennen. */
+ *  Dient dazu, „Suppress hat nicht gegriffen" ehrlich zu erkennen.
+ *
+ *  Gilt der ERSTE Block mit Schluss-Tag: ist der Text dazwischen nicht leer? Vorher `/<think>([\s\S]*?)<\/think>/.exec` —
+ *  dieselben Antworten wie jetzt (Differentialtest über alle Strings bis 6 Token), aber quadratisch bei vielen offenen
+ *  `<think>` ohne Schluss-Tag (50 000 Stück: 3,3 s, gemessen 2026-10-11, bei jeder Antwort von `checkResponse`). Das erste
+ *  `<think>` entscheidet: hat es kein Schluss-Tag hinter sich, haben die späteren auch keines. */
 export function reasoningHappened(content: string, reasoning: string | undefined): boolean {
   if (reasoning && reasoning.trim() !== "") return true;
-  const m = THINK_TAG.exec(content);
-  // `?? ""` statt `?.`: fehlte die Gruppe, heißt das „kein Inhalt" — also false, nicht true.
-  return !!m && (m[1] ?? "").trim() !== "";
+  const open = content.indexOf(THINK_OPEN);
+  if (open < 0) return false;
+  const from = open + THINK_OPEN.length;
+  const close = content.indexOf(THINK_CLOSE, from);
+  return close >= 0 && content.slice(from, close).trim() !== "";
 }
 
 const ALWAYS_ON = /\b(gpt-oss|harmony)\b/i;
