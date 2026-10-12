@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-10-12
+
 ### Added
 
 - A reachable endpoint row that has a model now shows the model's context length under the role line: "Context: loaded 65,536 · max 262,144 tokens" (only "max …" when the model is not loaded; nothing when the server does not report a number). LM Studio is asked first, then Ollama; the row's token goes with the request, each attempt gives up after 5 seconds, and "Reload models" asks again. Apple Intelligence, Automatic1111 and ComfyUI rows are never asked.
