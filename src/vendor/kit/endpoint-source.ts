@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.59.0, src/pure/endpoint-source.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.59.1, src/pure/endpoint-source.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 import { hydrateEndpointSecrets, resolveActiveEndpointConfig, type EndpointConfig } from "./endpoint_config";
 import type { SecretStore } from "./secrets";
 import { familyFromName, type BackendId, type FamilyId, type ModelFamilyId } from "./sampling-profiles";

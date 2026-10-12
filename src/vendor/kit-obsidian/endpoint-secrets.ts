@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.59.0, src/obsidian/endpoint-secrets.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.59.1, src/obsidian/endpoint-secrets.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 /** Schlüsselbund für die LOKALE Endpunkt-Liste eines Plugins ohne Endpoint-Manager.
  *
  *  Die Liste persistiert `secretId` statt `apiKey`; der Schlüssel lebt im Obsidian-Schlüsselbund

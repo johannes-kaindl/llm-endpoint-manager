@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.59.0, src/obsidian/endpoint-list.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.59.1, src/obsidian/endpoint-list.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 /* Geordneter Endpunkt-Fallback-Listen-Editor: eine Setting-Zeile je Endpunkt (URL ·
  * Schlüssel · Modell-Override · „zuerst verwenden" · entfernen) plus Adder-Zeile,
  * Status-Icon, Rollenzeile, Drittanbieter-Hinweis und Preset-Knöpfe.
@@ -197,7 +197,7 @@ export function buildEndpointList<T extends EndpointConfig = EndpointConfig>(opt
     const syncThirdPartyIcon = (hasKey: boolean): void => {
       if (hasKey) {
         if (thirdPartyIcon) return;   // schon da — nicht doppelt anlegen
-        thirdPartyIcon = s.controlEl.createSpan({ cls: "okit-ep-thirdparty" });
+        thirdPartyIcon = (actionsEl ?? s.controlEl).createSpan({ cls: "okit-ep-thirdparty" });
         setIcon(thirdPartyIcon, "alert-triangle");
         setTooltip(thirdPartyIcon, opts.strings.thirdParty);
       } else if (thirdPartyIcon) {
@@ -326,6 +326,9 @@ export function buildEndpointList<T extends EndpointConfig = EndpointConfig>(opt
         tx.inputEl.addEventListener("blur", () => { commit("apiKey", tx.getValue()); });
       });
     }
+    // Modell-Platz und Aktionen sitzen in EINEM Block (`okit-ep-tail`): bricht die Zeile um, wandert er
+    // als Ganzes in Zeile zwei, statt dass ein einzelner Knopf (bei Platz 1 nur der Papierkorb) allein steht.
+    let tailEl: HTMLElement | null = null;
     if (!isAdder) {
       // Modell-Override: Dropdown mit den Modellen GENAU DIESES Endpunkts. Die Liste kommt
       // aus dem Cache, nicht vom aktiven Client — eine Zeile kann einen ganz anderen
@@ -335,7 +338,8 @@ export function buildEndpointList<T extends EndpointConfig = EndpointConfig>(opt
       // (das jede add*-Komponente in Aufrufreihenfolge an controlEl anhängt) das Dropdown ans
       // Ende der Zeile — hinter den Mülleimer, ein Layout-Sprung inklusive. `renderModelPicker`
       // zeichnet über `target` deshalb direkt in dieses Element statt in `s.controlEl`.
-      const modelSlot = s.controlEl.createSpan({ cls: "okit-model-slot" });
+      tailEl = s.controlEl.createDiv({ cls: "okit-ep-tail" });
+      const modelSlot = tailEl.createSpan({ cls: "okit-model-slot" });
       const listKey = normalizeEndpoint(cfg.url);
       const gen = opts.cache.generation();
       void opts.cache.load(listKey, opts.clientFor(opts.get()[i] ?? (cfg as T))).then(({ models, reachable }) => {
@@ -365,7 +369,7 @@ export function buildEndpointList<T extends EndpointConfig = EndpointConfig>(opt
     // bricht einzelne Kinder um, den Container nur als Ganzes — sonst steht der Mülleimer allein
     // in Zeile zwei, sobald die Felder die Breite füllen (gemessen 2026-09-27, 900 px, vault-rag
     // und vault-crews). `addExtraButton` hängt ans Ende von controlEl, der Knopf wird umgehängt.
-    const actionsEl = isAdder ? null : s.controlEl.createDiv({ cls: "okit-ep-actions" });
+    const actionsEl = tailEl === null ? null : tailEl.createDiv({ cls: "okit-ep-actions" });
     const addAction = (build: Parameters<Setting["addExtraButton"]>[0]): void => {
       s.addExtraButton(b => { actionsEl?.appendChild(b.extraSettingsEl); build(b); });
     };
@@ -459,7 +463,7 @@ export function buildEndpointList<T extends EndpointConfig = EndpointConfig>(opt
       // Eingabe-Prüfung: nicht-blockierendes Warn-Icon (WCAG-Form + Tooltip)
       const warnings = validateEndpointInput(ep);
       if (warnings.length) {
-        const warnIcon = s.controlEl.createSpan({ cls: "okit-ep-warn" });
+        const warnIcon = (actionsEl ?? s.controlEl).createSpan({ cls: "okit-ep-warn" });
         setIcon(warnIcon, "alert-triangle");
         setTooltip(warnIcon, opts.strings.warnings(warnings));
       }
@@ -563,23 +567,36 @@ export const ENDPOINT_LIST_CSS = `
   min-width: 8em;
 }
 .okit-ep-row > .setting-item-control input[type="password"] {
-  flex-basis: 8em;
-  min-width: 6em;
+  flex-basis: 6em;
+  min-width: 5em;
 }
-/* Aktionsknöpfe (nach oben, Papierkorb) als ein Block: die Felder dürfen umbrechen, die Knöpfe
-   bleiben zusammen und behalten ihre Größe. Bricht der Block um, steht er rechtsbündig
-   (margin-left: auto), wie die umbrechende Modellzeile. Die Adresse behält ihre Basis von 12em —
-   eine abgeschnittene Adresse liest sich wie ein anderer Port; kleiner sind nur Schlüsselfeld
-   (8em) und Modell-Platz (8em, wächst mit dem freien Platz). */
-.okit-ep-row > .setting-item-control > .okit-ep-actions {
+/* Modell-Platz, Aktionsknöpfe (nach oben, Papierkorb) und Hinweis-Icons sitzen in einem Block
+   (okit-ep-tail, darin okit-ep-actions): die Felder dürfen umbrechen, der Block bleibt zusammen
+   und steht beim Umbruch rechtsbündig in Zeile zwei, auch wenn nur der Papierkorb da ist.
+   Adresse und Modell-ID sind die Hauptinformation der Zeile: eine abgeschnittene Adresse oder ID
+   liest sich wie ein anderer Port oder ein anderes Modell. Deshalb behält die Adresse 12em und
+   der Modell-Platz mindestens 12em (Basis 14em, reicht für eine typische ID wie
+   qwen/qwen3.8-27b); zuerst gibt das Schlüsselfeld nach (Basis 6em, leer zeigt es nur einen
+   Platzhalter). Eine längere ID endet mit einer Ellipse, die Auswahlliste zeigt sie voll. */
+.okit-ep-row > .setting-item-control > .okit-ep-tail {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-2);
+  flex: 1 1 auto;
+  min-width: 0;
+  justify-content: flex-end;
+}
+.okit-ep-row > .setting-item-control > .okit-ep-tail > .okit-ep-actions {
   display: flex;
   align-items: center;
   gap: var(--size-4-1);
   flex: 0 0 auto;
-  margin-left: auto;
 }
-.okit-ep-row > .setting-item-control > .okit-ep-actions > .clickable-icon {
+.okit-ep-row > .setting-item-control > .okit-ep-tail > .okit-ep-actions > .clickable-icon,
+.okit-ep-row > .setting-item-control > .okit-ep-tail > .okit-ep-actions > .okit-ep-warn,
+.okit-ep-row > .setting-item-control > .okit-ep-tail > .okit-ep-actions > .okit-ep-thirdparty {
   flex: 0 0 auto;
+  margin-right: 0;
 }
 /* Reservierter Platz für das Modell-Dropdown (Auffüllen der Zeile erst nach dem geladenen
    Promise, siehe buildEndpointList). Selbst ein Flex-Container, damit Dropdown/Freitext + der
@@ -588,12 +605,13 @@ export const ENDPOINT_LIST_CSS = `
   display: flex;
   align-items: center;
   gap: var(--size-4-1);
-  flex: 1 1 8em;
-  min-width: 8em;
+  flex: 1 1 14em;
+  min-width: 12em;
 }
 .okit-ep-row > .setting-item-control .okit-model-slot select,
 .okit-ep-row > .setting-item-control .okit-model-slot input[type="text"] {
   flex: 1 1 auto;
   min-width: 0;
+  text-overflow: ellipsis;
 }
 `;

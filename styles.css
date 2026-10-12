@@ -1,6 +1,6 @@
 /* Nur Theme-CSS-Variablen (UI-STANDARD). Praefix lem-. Kein !important. */
 
-/* uebernommen aus src/vendor/kit-obsidian/endpoint-list.ts (ENDPOINT_LIST_CSS), obsidian-kit 0.59.0, 2026-10-12 */
+/* uebernommen aus src/vendor/kit-obsidian/endpoint-list.ts (ENDPOINT_LIST_CSS), obsidian-kit 0.59.1, 2026-10-12 */
 /* Pro-Zeile-Status der Endpunkt-Fallback-Liste: Form trägt die Bedeutung, Farbe sekundär (WCAG 1.4.1). */
 .okit-ep-status { display: inline-flex; align-items: center; margin-right: 8px; vertical-align: middle; color: var(--text-muted); }
 .okit-ep-status svg { width: 14px; height: 14px; }
@@ -64,23 +64,36 @@
   min-width: 8em;
 }
 .okit-ep-row > .setting-item-control input[type="password"] {
-  flex-basis: 8em;
-  min-width: 6em;
+  flex-basis: 6em;
+  min-width: 5em;
 }
-/* Aktionsknöpfe (nach oben, Papierkorb) als ein Block: die Felder dürfen umbrechen, die Knöpfe
-   bleiben zusammen und behalten ihre Größe. Bricht der Block um, steht er rechtsbündig
-   (margin-left: auto), wie die umbrechende Modellzeile. Die Adresse behält ihre Basis von 12em —
-   eine abgeschnittene Adresse liest sich wie ein anderer Port; kleiner sind nur Schlüsselfeld
-   (8em) und Modell-Platz (8em, wächst mit dem freien Platz). */
-.okit-ep-row > .setting-item-control > .okit-ep-actions {
+/* Modell-Platz, Aktionsknöpfe (nach oben, Papierkorb) und Hinweis-Icons sitzen in einem Block
+   (okit-ep-tail, darin okit-ep-actions): die Felder dürfen umbrechen, der Block bleibt zusammen
+   und steht beim Umbruch rechtsbündig in Zeile zwei, auch wenn nur der Papierkorb da ist.
+   Adresse und Modell-ID sind die Hauptinformation der Zeile: eine abgeschnittene Adresse oder ID
+   liest sich wie ein anderer Port oder ein anderes Modell. Deshalb behält die Adresse 12em und
+   der Modell-Platz mindestens 12em (Basis 14em, reicht für eine typische ID wie
+   qwen/qwen3.8-27b); zuerst gibt das Schlüsselfeld nach (Basis 6em, leer zeigt es nur einen
+   Platzhalter). Eine längere ID endet mit einer Ellipse, die Auswahlliste zeigt sie voll. */
+.okit-ep-row > .setting-item-control > .okit-ep-tail {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-2);
+  flex: 1 1 auto;
+  min-width: 0;
+  justify-content: flex-end;
+}
+.okit-ep-row > .setting-item-control > .okit-ep-tail > .okit-ep-actions {
   display: flex;
   align-items: center;
   gap: var(--size-4-1);
   flex: 0 0 auto;
-  margin-left: auto;
 }
-.okit-ep-row > .setting-item-control > .okit-ep-actions > .clickable-icon {
+.okit-ep-row > .setting-item-control > .okit-ep-tail > .okit-ep-actions > .clickable-icon,
+.okit-ep-row > .setting-item-control > .okit-ep-tail > .okit-ep-actions > .okit-ep-warn,
+.okit-ep-row > .setting-item-control > .okit-ep-tail > .okit-ep-actions > .okit-ep-thirdparty {
   flex: 0 0 auto;
+  margin-right: 0;
 }
 /* Reservierter Platz für das Modell-Dropdown (Auffüllen der Zeile erst nach dem geladenen
    Promise, siehe buildEndpointList). Selbst ein Flex-Container, damit Dropdown/Freitext + der
@@ -89,13 +102,14 @@
   display: flex;
   align-items: center;
   gap: var(--size-4-1);
-  flex: 1 1 8em;
-  min-width: 8em;
+  flex: 1 1 14em;
+  min-width: 12em;
 }
 .okit-ep-row > .setting-item-control .okit-model-slot select,
 .okit-ep-row > .setting-item-control .okit-model-slot input[type="text"] {
   flex: 1 1 auto;
   min-width: 0;
+  text-overflow: ellipsis;
 }
 
 /* Zusatzzeile je Endpunkt (Label, Protokoll, Fähigkeiten, aktiv) — okit-ep-extra kommt aus dem Kit. */
