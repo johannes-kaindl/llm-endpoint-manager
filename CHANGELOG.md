@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- A new Apple Intelligence row is named after its preset ("Apple Intelligence (on-device)", "Apple Intelligence (auf dem Gerät)" in German) instead of "on-device", the host part of its internal address. A preset row with a cloud address and no host (OpenAI-compatible cloud) now also takes the translated preset name. Rows created from a typed address still take the host.
+
 ## [0.6.0] — 2026-10-12
 
 ### Added

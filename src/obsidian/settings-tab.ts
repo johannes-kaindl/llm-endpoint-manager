@@ -137,7 +137,7 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
     return eps.map((e) => {
       if (e.id) return e;
       const preset = PRESETS.find((p) => normalizeEndpoint(p.url) === normalizeEndpoint(e.url));
-      const out: ManagedEndpoint = { ...e, id: newId(), label: e.label || labelFromUrl(e.url) || preset?.label || t("row.newEndpoint"), provider: preset?.provider ?? "openai",
+      const out: ManagedEndpoint = { ...e, id: newId(), label: e.label || (preset?.transport && presetText(preset)) || labelFromUrl(e.url) || (preset && presetText(preset)) || t("row.newEndpoint"), provider: preset?.provider ?? "openai",
         capabilities: preset ? [...preset.capabilities] : ["chat"], enabled: true };
       if (preset?.transport) out.transport = preset.transport;
       if (preset?.shortcut) out.shortcut = { ...preset.shortcut };

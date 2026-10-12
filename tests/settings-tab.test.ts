@@ -202,6 +202,15 @@ describe("LlmEndpointManagerSettingTab", () => {
     expect(complete([{ url: "http://localhost:1234" }])[0]?.label).toBe("localhost:1234");   // mit Host bleibt es der Host
     expect(complete([{ url: "kaputt://" }])[0]?.label).toBe("New endpoint");   // kein Preset, kein Host → Platzhalter (en im Mock)
   });
+  it("nennt die neue Apple-Zeile bei ihrem (uebersetzten) Preset-Namen, nicht beim Host-Teil „on-device“", async () => {
+    const { tab: t } = await tab({});
+    const complete = (t as unknown as { complete: (e: { url: string; label?: string }[]) => { label: string }[] }).complete.bind(t);
+    expect(complete([{ url: "apple-shortcuts://on-device" }])[0]?.label).toBe("Apple Intelligence (on-device)");
+    setLang("de");
+    try { expect(complete([{ url: "apple-shortcuts://on-device" }])[0]?.label).toBe(presetText({ label: "Apple Intelligence (on-device)" })); }
+    finally { setLang("en"); }
+    expect(complete([{ url: "apple-shortcuts://on-device", label: "Mein Kurzbefehl" }])[0]?.label).toBe("Mein Kurzbefehl");   // ein gesetztes Label gewinnt
+  });
   it("uebernimmt transport/shortcut aus dem Apple-Preset beim Vervollstaendigen", async () => {
     const { tab: t } = await tab({});
     const complete = (t as unknown as { complete: (e: { url: string; label?: string }[]) => { transport?: string; shortcut?: { name: string; timeoutMs: number } }[] }).complete.bind(t);
