@@ -25,10 +25,10 @@
  * (Dach-AGENTS.md, README-Bilder: ein Rezept maskiert in der Darstellung, nicht im Speicher).
  */
 
-import { createServer, type Server } from "node:http";
 import { argv, cwd, exit } from "node:process";
 
 import { Cdp, attachTo, pollUntil, requireVisible } from "../../tools/obsidian-cdp/cdp.js";
+import { startLlmStub, type LlmStub } from "../../tools/obsidian-cdp/llm-stub.js";
 import { capture, setWindowSize, writeShot, type Rect } from "../../tools/obsidian-cdp/shot.js";
 import { buildVault, stagingVaultDir } from "../../tools/obsidian-cdp/vault.js";
 
@@ -45,47 +45,24 @@ const DEMO_TOKEN = "demo-token";
 
 const q = (s: unknown): string => JSON.stringify(s);
 
-// --- Fake-Server ------------------------------------------------------------------------
+// --- Fake-Server (zentraler LLM-Stub, feste Ports) -----------------------------------------
 type Fake = { close: () => Promise<void> };
 
-function listen(server: Server, port: number): Promise<Fake> {
-  return new Promise((resolve, reject) => {
-    server.once("error", (e) => { reject(new Error(`Port ${port} ist belegt oder nicht bindbar: ${(e as Error).message}`)); });
-    server.listen(port, "127.0.0.1", () => {
-      resolve({ close: () => new Promise<void>((r) => { server.close(() => { r(); }); server.closeAllConnections(); }) });
-    });
-  });
-}
-
-const json = (res: import("node:http").ServerResponse, status: number, body: unknown): void => {
-  res.writeHead(status, { "Content-Type": "application/json" });
-  res.end(JSON.stringify(body));
-};
+const aufStub = (stub: LlmStub): Fake => ({ close: () => stub.stop() });
 
 /** LM-Studio-Attrappe: `/v1/models` (Erreichbarkeit, Modell-Liste) und `/api/v1/models`
  *  (Backend-Erkennung). Nichts davon laedt ein Modell — wie beim echten Manager. */
-function startFakeLmStudio(): Promise<Fake> {
-  const server = createServer((req, res) => {
-    if (req.url?.includes("/api/v1/models")) return json(res, 200, { data: [{ id: "qwen/qwen3.8-27b", capabilities: {} }] });
-    if (req.url?.includes("/v1/models")) {
-      return json(res, 200, { data: [
-        { id: "qwen/qwen3.8-27b", object: "model" },
-        { id: "qwen/qwen3.8-27b@4bit", object: "model" },
-        { id: "gemma-4-12b-it", object: "model" },
-        { id: "text-embedding-nomic-embed-text-v1.5", object: "model" },
-      ] });
-    }
-    return json(res, 404, { error: "not found" });
+async function startFakeLmStudio(): Promise<Fake> {
+  const stub = await startLlmStub({
+    port: LM_PORT,
+    models: ["qwen/qwen3.8-27b", "qwen/qwen3.8-27b@4bit", "gemma-4-12b-it", "text-embedding-nomic-embed-text-v1.5"],
+    lmStudioV1: { capabilities: {} },
   });
-  return listen(server, LM_PORT);
+  return aufStub(stub);
 }
 
-function startFakeOllama(): Promise<Fake> {
-  const server = createServer((req, res) => {
-    if (req.url?.includes("/v1/models")) return json(res, 200, { data: [{ id: "llama3.2:3b", object: "model" }, { id: "nomic-embed-text", object: "model" }] });
-    return json(res, 404, { error: "not found" });
-  });
-  return listen(server, OLLAMA_PORT);
+async function startFakeOllama(): Promise<Fake> {
+  return aufStub(await startLlmStub({ port: OLLAMA_PORT, models: ["llama3.2:3b", "nomic-embed-text"] }));
 }
 
 // --- Zustand ----------------------------------------------------------------------------

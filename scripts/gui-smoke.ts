@@ -32,13 +32,12 @@
  *
  * Typen: `tsconfig.scripts.json` (im `gate` ueber `npm run typecheck:scripts`).
  */
-import { createServer, type Server } from "node:http";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { cwd } from "node:process";
-import type { AddressInfo } from "node:net";
 
 import { Cdp, attachTo, bereiteInstanzVor, clickReal, pollUntil, requireVisible } from "../../tools/obsidian-cdp/cdp.js";
+import { startLlmStub, type LlmStub } from "../../tools/obsidian-cdp/llm-stub.js";
 import { createBilanz, parseArgs, runDriver } from "../../tools/obsidian-cdp/bilanz.js";
 import { buildVault, requireEigenerBuild, stagingVaultDir } from "../../tools/obsidian-cdp/vault.js";
 
@@ -70,6 +69,9 @@ const { record, abschluss } = createBilanz({ punkte: PUNKTE });
 
 const q = (s: unknown): string => JSON.stringify(s);
 
+/** Fake-Server auf dem zentralen LLM-Stub; `stub.start()` belegt nach `close()` denselben Port (B3). */
+interface FakeServer { url: string; stub: LlmStub; close: () => Promise<void> }
+
 // --- Fake-Endpunkt (koda-agent-Muster) -------------------------------------------------
 /**
  * Eigener Mini-HTTP-Server statt eines evtl. laufenden echten LLM-Servers: die B-Punkte
@@ -78,21 +80,9 @@ const q = (s: unknown): string => JSON.stringify(s);
  * OS einen freien waehlen, `close()` gibt ein Promise, weil B3 denselben Server-Zustand
  * (Port) fuer die Wieder-Erreichbarkeits-Probe braucht.
  */
-async function startFakeEndpoint(): Promise<{ url: string; close: () => Promise<void> }> {
-  const server: Server = createServer((req, res) => {
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(
-      req.url?.includes("/v1/models") === true
-        ? JSON.stringify({ data: [{ id: "smoke-model", object: "model" }] })
-        : JSON.stringify({ ok: true }),
-    );
-  });
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const port = (server.address() as AddressInfo).port;
-  return {
-    url: `http://127.0.0.1:${port}`,
-    close: () => new Promise<void>((resolve) => { server.close(() => { resolve(); }); }),
-  };
+async function startFakeEndpoint(): Promise<FakeServer> {
+  const stub = await startLlmStub({ models: ["smoke-model"] });
+  return { url: stub.url, stub, close: () => stub.stop() };
 }
 
 /** Eigener Mini-Server statt eines evtl. laufenden echten LM Studio — D3 prueft nur den
@@ -100,22 +90,9 @@ async function startFakeEndpoint(): Promise<{ url: string; close: () => Promise<
  *  Modell-Load (Auftragsregel 12: „Im Smoke nur gegen die Endpunkte, die der Treiber ohnehin
  *  anlegt"). `model` muss in der zurueckgegebenen Liste stehen — `probeEndpoint`/`parseLmStudioV1`
  *  matcht per `id`, ein Treffer ohne passende ID gilt als „nicht gefunden" (siehe capabilities.ts). */
-async function startFakeLmStudio(): Promise<{ url: string; close: () => Promise<void> }> {
-  const server: Server = createServer((req, res) => {
-    if (req.url?.includes("/api/v1/models") === true) {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ data: [{ id: "smoke-model", capabilities: {} }] }));
-      return;
-    }
-    res.writeHead(404, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ error: "not found" }));
-  });
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const port = (server.address() as AddressInfo).port;
-  return {
-    url: `http://127.0.0.1:${port}`,
-    close: () => new Promise<void>((resolve) => { server.close(() => { resolve(); }); }),
-  };
+async function startFakeLmStudio(): Promise<FakeServer> {
+  const stub = await startLlmStub({ models: ["smoke-model"], lmStudioV1: { capabilities: {} } });
+  return { url: stub.url, stub, close: () => stub.stop() };
 }
 
 // --- Settings-Stelle: Modal (< 1.13) oder eigenes Fenster (>= 1.13) --------------------
@@ -225,8 +202,8 @@ async function main(): Promise<void> {
     );
   }
 
-  let fake: { url: string; close: () => Promise<void> } | null = null;
-  let fakeLm: { url: string; close: () => Promise<void> } | null = null;
+  let fake: FakeServer | null = null;
+  let fakeLm: FakeServer | null = null;
   let settings: SettingsStelle | null = null;
   const warnungen: string[] = [];
   // Zwei Zustandssorten ueberleben einen Ctrl-C mitten im Lauf, das `finally` unten nie: der
@@ -484,7 +461,7 @@ async function main(): Promise<void> {
     // no-endpoint melden, weil der Cache nicht erneut probt. Derselbe Port (nicht irgendein
     // neuer): "innerhalb der TTL" prueft denselben Endpunkt-Eintrag, nur mit wiederkehrendem
     // Server dahinter — ein neuer Port waere ein neuer, noch nie gecachter Endpunkt.
-    const fake3 = await startFakeEndpointOnPort(fakeUrl);
+    await fake.stub.start();
     const resolveDown2 = await cdp.evaluate<{ error?: string }>(`return await app.plugins.plugins[${q(PLUGIN_ID)}].api.resolve("chat");`);
 
     // api.models(id,{force:true}) haengt an einem EIGENEN Cache (model-list-cache in
@@ -493,7 +470,7 @@ async function main(): Promise<void> {
     const modelsRes = await cdp.evaluate<{ error?: string } | string[]>(`
       return await app.plugins.plugins[${q(PLUGIN_ID)}].api.models(${q(fakeId)}, { force: true });
     `);
-    await fake3.close();
+    await fake.close();
     const modelsOk = Array.isArray(modelsRes) && modelsRes.includes("smoke-model");
     record(
       "B3 Fake-Server stoppen → no-endpoint; innerhalb TTL trotz Neustart weiter no-endpoint (Cache); api.models(force) wieder erreichbar",
@@ -696,26 +673,6 @@ async function main(): Promise<void> {
  *  Schluesselbund + UI-Text), nur die Datei-Halbmessung entfaellt mit Begruendung im Detail. */
 function stagingVaultDirSafe(): string | null {
   try { return stagingVaultDir(REPO_NAME); } catch { return null; }
-}
-
-/** Denselben Port erneut belegen, NACHDEM er frei wurde (B3: „wieder gestartet"). Ein
- *  einfaches `startFakeEndpoint()` waehlt einen neuen Zufallsport — B3 misst aber bewusst
- *  DENSELBEN Endpunkt-Eintrag, nur mit wiederkehrendem Server dahinter. */
-async function startFakeEndpointOnPort(url: string): Promise<{ url: string; close: () => Promise<void> }> {
-  const port = Number(new URL(url).port);
-  const server: Server = createServer((req, res) => {
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(
-      req.url?.includes("/v1/models") === true
-        ? JSON.stringify({ data: [{ id: "smoke-model", object: "model" }] })
-        : JSON.stringify({ ok: true }),
-    );
-  });
-  await new Promise<void>((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(port, "127.0.0.1", resolve);
-  });
-  return { url, close: () => new Promise<void>((resolve) => { server.close(() => { resolve(); }); }) };
 }
 
 runDriver(main);
