@@ -74,3 +74,21 @@ export async function resolveFirst(
   }
   return { error: "no-endpoint" };
 }
+
+/** Welcher Eintrag bekäme `resolve(cap)` gerade? Dieselbe Auswahl wie `resolveFirst`, aber ohne Probe:
+ *  Erreichbarkeit kommt aus `known` (unbekannt zählt wie nicht erreichbar). Gibt die normalisierte URL
+ *  zurück, damit die Endpunkt-Liste ihre Zeilen damit vergleichen kann. */
+export function firstActiveUrl(
+  eps: ManagedEndpoint[],
+  cap: Capability,
+  known: (url: string) => boolean | undefined,
+  token: (secretId: string) => string | null,
+): string | null {
+  for (const ep of eps) {
+    if (!ep.enabled || !ep.capabilities.includes(cap) || ep.transport === "shortcuts") continue;
+    if ("error" in materialize(ep, token)) continue;
+    const url = normalizeEndpoint(ep.url);
+    if (known(url) === true) return url;
+  }
+  return null;
+}

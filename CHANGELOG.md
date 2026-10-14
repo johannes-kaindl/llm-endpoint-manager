@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- Settings, endpoint list: the row of the endpoint a plugin would get for chat now reads "active" instead of "reachable, position 1". It follows the same rule as the API call `resolve` (first enabled, reachable endpoint with a usable token); the rows below it keep "reachable, position N".
+
 ## [0.7.0] — 2026-10-12
 
 ### Changed

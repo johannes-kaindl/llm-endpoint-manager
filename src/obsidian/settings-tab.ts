@@ -13,6 +13,7 @@ import { probeBaseUrl, probeEndpoint } from "../vendor/kit/capabilities";
 import { CAPABILITIES, PROVIDERS, DEFAULT_SHORTCUT_NAME, DEFAULT_SHORTCUT_TIMEOUT_MS, labelFromUrl, newId, type ManagedEndpoint, type Provider } from "../core/model";
 import { modelRows, setModelMeta, type ModelRow } from "../core/model-rows";
 import { PRESETS } from "../core/provider";
+import { firstActiveUrl } from "../core/reachability";
 import { clientFor, capabilityFetch, loadModelContext } from "./http";
 import type { ModelContext } from "../vendor/kit/model-context";
 
@@ -41,6 +42,10 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
    *  ginge jedes Mal eine Anfrage an den Server. „Modelle neu laden" leert den Eintrag der URL. */
   private contextCache = new Map<string, Promise<ModelContext | null>>();
   private cleanupPrevious: () => void = () => {};
+  /** Probe-Ergebnisse der Zeilen im aktuellen Render (normalisierte URL → erreichbar) und die laufenden
+   *  Proben. Daraus bestimmt `active()` die Zeile, die `resolve("chat")` gerade bekäme. */
+  private rowReach = new Map<string, boolean>();
+  private rowProbes = new Map<string, Promise<unknown>>();
 
   constructor(app: App, readonly plugin: LlmEndpointManagerPlugin) {
     super(app, plugin);
@@ -146,7 +151,27 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
     });
   }
 
+  /** Client einer Zeile. Die Probe wartet auf die Proben aller Zeilen darüber und hält ihr Ergebnis fest:
+   *  Erst dann weiß `active()`, ob eine frühere Zeile den Platz schon belegt (sonst markierte die schnellere
+   *  Zeile weiter unten sich selbst, bevor die erste geantwortet hat). */
+  private rowClient(cfg: ManagedEndpoint): ReturnType<typeof clientFor> {
+    const base = clientFor(this.withToken(cfg), cfg.provider ?? "openai");
+    const key = normalizeEndpoint(cfg.url);
+    return {
+      ...base,
+      probe: () => {
+        const eps = this.plugin.settings.endpoints;
+        const idx = eps.findIndex((e) => e.id === cfg.id);
+        const earlier = (idx < 0 ? [] : eps.slice(0, idx)).flatMap((e) => this.rowProbes.get(normalizeEndpoint(e.url)) ?? []);
+        const run = Promise.allSettled(earlier).then(() => base.probe()).then((status) => { this.rowReach.set(key, status.reachable); return status; });
+        this.rowProbes.set(key, run.catch(() => undefined));
+        return run;
+      },
+    };
+  }
+
   private renderEndpoints(setting: Setting): void {
+    this.rowReach.clear(); this.rowProbes.clear();
     buildEndpointList<ManagedEndpoint>({
       containerEl: settingBodyHost(setting),
       label: t("set.endpoints"), desc: t("set.endpointsDesc"), placeholder: "http://localhost:1234",
@@ -160,8 +185,8 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
         }
         this.plugin.settings.endpoints = this.complete(eps);
       },
-      active: () => null,
-      clientFor: (cfg) => clientFor(this.withToken(cfg), cfg.provider ?? "openai"),
+      active: () => firstActiveUrl(this.plugin.settings.endpoints, "chat", (u) => this.rowReach.get(u), (sid) => this.plugin.secrets.get(sid)),
+      clientFor: (cfg) => this.rowClient(cfg),
       save: () => this.plugin.saveSettings(),
       reconnect: async () => { this.plugin.handle.reachability.clear(); },
       rerender: () => { this.refreshUi(); },

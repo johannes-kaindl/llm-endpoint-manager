@@ -11,7 +11,7 @@
 
 If several plugins in your vault talk to language models, each one normally asks you for the same server address and the same API token. LLM Endpoint Manager is the one place where you enter them once. Tokens are never written to `data.json` — they live exclusively in Obsidian's keychain — and other plugins reach the endpoint list through a small API. It owns endpoints, tokens, model lists and reachability checks; it knows nothing about prompts, roles or requests, which stays with the plugins that consume the API.
 
-<img src="https://raw.githubusercontent.com/johannes-kaindl/llm-endpoint-manager/main/docs/images/hero.png" width="820" alt="The settings window of LLM Endpoint Manager: a list of endpoints with LM Studio at reachable position 1 and Ollama at position 2, each with a green status indicator, protocol, capability toggles and an Enabled switch">
+<img src="https://raw.githubusercontent.com/johannes-kaindl/llm-endpoint-manager/main/docs/images/hero.png" width="820" alt="The settings window of LLM Endpoint Manager: a list of endpoints with LM Studio marked active and Ollama at position 2, each with a green status indicator, protocol, capability toggles and an Enabled switch">
 
 ## Features
 
@@ -59,7 +59,7 @@ The plugin has no commands and no ribbon icon; everything happens in **Settings 
 1. Under **Endpoints**, type an address into the field **Add an endpoint: http://localhost:1234** and click out of the field (rows are saved when a field loses focus) — or click a one-click preset button (**LM Studio**, **Ollama**, **OpenAI-compatible cloud**).
 2. Check the row's **Protocol** and **Capabilities**. A row without a capability is invisible to every plugin and shows a warning.
 3. Optional: paste an **API token (optional)** into the row. It goes into the keychain; the row then shows **token saved**.
-4. Read the status indicator on the row: **reachable, position 1** means this is the first choice for a plugin (given the capability it asks for), **reachable, position 2** means a better one comes first. Use **Use first** to change the order.
+4. Read the status indicator on the row: **active** means this is the endpoint a plugin asking for chat gets right now (the first enabled, reachable one with a usable token), **reachable, position 2** means a better one comes first. Use **Use first** to change the order.
 5. Under **Models**, review the model list per endpoint, set a **Family** where the suggestion is wrong, and use **Detect** to fill in the **Backend**.
 
 ### Configuration

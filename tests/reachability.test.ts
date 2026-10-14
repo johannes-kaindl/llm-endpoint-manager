@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { createReachabilityCache, materialize, resolveFirst } from "../src/core/reachability";
+import { createReachabilityCache, firstActiveUrl, materialize, resolveFirst } from "../src/core/reachability";
 import type { ManagedEndpoint } from "../src/core/model";
 
 const ep = (o: Partial<ManagedEndpoint> & { url: string }): ManagedEndpoint => ({
@@ -73,5 +73,22 @@ describe("resolveFirst", () => {
     const r = await resolveFirst(list, "chat", createReachabilityCache(() => 0), probe, () => null);
     expect((r as { ep: ManagedEndpoint }).ep.url).toBe("http://ok");
     expect(probe.mock.calls.map(c => c[0].config.url)).toEqual(["http://ok"]);
+  });
+});
+
+describe("firstActiveUrl", () => {
+  const tok = (sid: string): string | null => (sid === "ok" ? "t" : null);
+  it("liefert die normalisierte URL des ersten aktiven, erreichbaren Eintrags mit der Fähigkeit", () => {
+    const eps = [ep({ url: "http://a", enabled: false }), ep({ url: "http://b" }), ep({ url: "http://c/v1" })];
+    const known = new Map([["http://b", false], ["http://c", true]]);
+    expect(firstActiveUrl(eps, "chat", (u) => known.get(u), tok)).toBe("http://c");
+  });
+  it("überspringt Einträge ohne Fähigkeit, ohne Token und Kurzbefehle wie resolve", () => {
+    const eps = [ep({ url: "http://a", capabilities: ["embedding"] }), ep({ url: "http://b", secretId: "weg" }), ep({ url: "apple-shortcuts://x", transport: "shortcuts" }), ep({ url: "http://d", secretId: "ok" })];
+    expect(firstActiveUrl(eps, "chat", () => true, tok)).toBe("http://d");
+  });
+  it("liefert null, solange kein Eintrag als erreichbar bekannt ist", () => {
+    expect(firstActiveUrl([ep({ url: "http://a" })], "chat", () => undefined, tok)).toBeNull();
+    expect(firstActiveUrl([ep({ url: "http://a" })], "chat", () => false, tok)).toBeNull();
   });
 });
