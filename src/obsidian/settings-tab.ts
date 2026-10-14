@@ -45,7 +45,7 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
   /** Probe-Ergebnisse der Zeilen im aktuellen Render (normalisierte URL → erreichbar) und die laufenden
    *  Proben. Daraus bestimmt `active()` die Zeile, die `resolve("chat")` gerade bekäme. */
   private ownSaves = 0;
-  private unsubscribeChanged: () => void = () => {};
+  private unsubscribeChanged: (() => void) | null = null;
   private rowReach = new Map<string, boolean>();
   private rowProbes = new Map<string, Promise<unknown>>();
 
@@ -80,7 +80,7 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
   }
 
   hide(): void {
-    this.unsubscribeChanged();
+    this.stopWatching();
     this.contextCache.clear();
     this.modelLists.clear();   // Kit-Vertrag: sonst bleibt „nicht erreichbar" für die Sitzung stehen
   }
@@ -194,8 +194,16 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
 
   /** Ein Nachbarplugin importiert Endpunkte, während der Tab offen ist: die Liste zieht nach. */
   private watchChanges(): void {
-    this.unsubscribeChanged();
+    // Nur einmal je Sichtbarkeit abonnieren: das Neuzeichnen ruft diese Methode wieder, und ein Abo, das beim
+    // Melden ein neues Abo anlegt, wird von der Listener-Menge des Managers im selben Durchlauf erneut gerufen
+    // (Endlosschleife, gemessen im Smoke: Renderer 108 % CPU, Runtime.evaluate läuft in den Timeout).
+    if (this.unsubscribeChanged) return;
     this.unsubscribeChanged = this.plugin.api.on("changed", () => { if (this.ownSaves === 0) this.refreshUi(); });
+  }
+
+  private stopWatching(): void {
+    this.unsubscribeChanged?.();
+    this.unsubscribeChanged = null;
   }
 
   private renderEndpoints(setting: Setting): void {

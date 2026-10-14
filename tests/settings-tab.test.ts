@@ -287,7 +287,9 @@ describe("Entfernen und Nachziehen im Endpunkt-Tab", () => {
   it("zeichnet die Liste neu, wenn ein Nachbar importiert, nicht bei der eigenen Speicherung; hide beendet das Abo", async () => {
     const { tab: t, plugin } = await tab({ endpoints: [{ id: "e1", label: "A", url: "http://a", capabilities: ["chat"] }] });
     let renders = 0;
-    (t as unknown as { refreshUi: () => void }).refreshUi = () => { renders++; };
+    const w = t as unknown as { refreshUi: () => void; watchChanges(): void };
+    // das echte Neuzeichnen ruft watchChanges erneut; ein Abo, das dabei neu anlegt, liefe in der Listener-Menge endlos
+    w.refreshUi = () => { renders++; if (renders > 50) throw new Error("Endlosschleife"); w.watchChanges(); };
     (t as unknown as { watchChanges(): void }).watchChanges();
     await plugin.api.importEndpoints([{ url: "http://c" }], "chat");
     const nachImport = renders;
