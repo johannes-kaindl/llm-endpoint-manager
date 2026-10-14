@@ -294,6 +294,7 @@ describe("Entfernen und Nachziehen im Endpunkt-Tab", () => {
     await plugin.api.importEndpoints([{ url: "http://c" }], "chat");
     const nachImport = renders;
     expect(nachImport).toBeGreaterThan(0);
+    expect(nachImport).toBeLessThan(10);   // der Manager meldet je Import zweimal, nicht endlos
     await (t as unknown as { own<T>(f: () => Promise<T>): Promise<T> }).own(() => plugin.saveSettings());
     expect(renders).toBe(nachImport);
     t.hide();
