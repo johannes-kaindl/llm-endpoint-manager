@@ -36,7 +36,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { cwd } from "node:process";
 
-import { Cdp, attachTo, bereiteInstanzVor, clickReal, pollUntil, requireVisible } from "../../tools/obsidian-cdp/cdp.js";
+import { Cdp, attachTo, beimAbbruch, bereiteInstanzVor, clickReal, istAbgebrochen, pollUntil, requireVisible } from "../../tools/obsidian-cdp/cdp.js";
 import { startLlmStub, type LlmStub } from "../../tools/obsidian-cdp/llm-stub.js";
 import { createBilanz, parseArgs, runDriver } from "../../tools/obsidian-cdp/bilanz.js";
 import { buildVault, requireEigenerBuild, stagingVaultDir } from "../../tools/obsidian-cdp/vault.js";
@@ -212,26 +212,17 @@ async function main(): Promise<void> {
   // `${PLUGIN_ID}-${epId}`) — die zufaellige `epId` macht diesen Eintrag ohne den Handler
   // dauerhaft verwaist: kein kuenftiger Lauf generiert je wieder dieselbe UUID, um ihn zu finden.
   let activeSecretId: string | null = null;
-  let signalCleanupRunning = false;
-  const onAbortSignal = (signal: NodeJS.Signals) => {
-    if (signalCleanupRunning) return;
-    signalCleanupRunning = true;
-    void (async () => {
-      console.log(`\n\nAbbruch durch ${signal} — raeume Testdaten auf...`);
-      await cdp.evaluate(`
-        const p = app.plugins.plugins[${q(PLUGIN_ID)}];
-        if (p) { p.settings.endpoints = []; await p.saveSettings(); }
-        ${activeSecretId ? `app.secretStorage.setSecret(${q(activeSecretId)}, "");` : ""}
-        return true;
-      `).catch(() => { console.log("  ! Aufraeumen im Renderer fehlgeschlagen — data.json/Schluesselbund von Hand pruefen"); });
-      if (fake) await fake.close().catch(() => undefined);
-      if (fakeLm) await fakeLm.close().catch(() => undefined);
-      cdp.close();
-      process.exit(130);
-    })();
+  // Abbruch-Modul der Bruecke (Welle 21): das Modul sperrt den Hauptzweig, ruft diesen Schritt und druckt die Bilanz.
+  // Idempotent: derselbe Schritt laeuft im Normalweg ueber `schliesse()` im `finally`.
+  const zustandZurueck = async (): Promise<void> => {
+    await cdp.evaluate(`
+      const p = app.plugins.plugins[${q(PLUGIN_ID)}];
+      if (p) { p.settings.endpoints = []; await p.saveSettings(); }
+      ${activeSecretId ? `app.secretStorage.setSecret(${q(activeSecretId)}, "");` : ""}
+      return true;
+    `).catch(() => { console.log("  ! Aufraeumen im Renderer fehlgeschlagen — data.json/Schluesselbund von Hand pruefen"); });
   };
-  process.on("SIGINT", onAbortSignal);
-  process.on("SIGTERM", onAbortSignal);
+  const zustand = beimAbbruch(zustandZurueck, "Test-Endpunkte und Schluesselbund-Eintrag zuruecksetzen");
 
   try {
     await requireVisible(cdp);
@@ -642,24 +633,15 @@ async function main(): Promise<void> {
       JSON.stringify(filterRes),
     );
   } finally {
-    // B haengt seinen Fake-Endpunkt am Ende NICHT selbst aus — ohne diese Zeile hinterlaesst
+    // B haengt seinen Fake-Endpunkt am Ende NICHT selbst aus — ohne diesen Schritt hinterlaesst
     // schon ein regulaer DURCHGELAUFENER Lauf einen Rest in settings.endpoints, den C2 des
-    // naechsten Laufs faelschlich als „aus einem Ctrl-C" liest (gemessen beim Einbau dieses
-    // Punkts: der Vorlauf-Lauf ohne diese Zeile faerbte C2 rot, obwohl nichts abgebrochen war).
-    await cdp.evaluate(`
-      const p = app.plugins.plugins[${q(PLUGIN_ID)}];
-      if (p) { p.settings.endpoints = []; await p.saveSettings(); }
-      return true;
-    `).catch(() => undefined);
+    // naechsten Laufs faelschlich als „aus einem Ctrl-C" liest. Nach Ctrl-C raeumt das Modul.
+    await zustand.schliesse();
+    if (istAbgebrochen()) return;
     if (settings) closeSettings(cdp, settings);
     if (fake) await fake.close().catch(() => undefined);
     if (fakeLm) await fakeLm.close().catch(() => undefined);
     cdp.close();
-    // Abmelden, sonst haengt ein SPAETES Signal (nach normalem Abschluss, cdp schon zu) den
-    // Prozess in `onAbortSignal`s cdp.evaluate auf einer toten Verbindung auf (gemessen: ein
-    // SIGINT, das den Lauf knapp verpasst, liess den Node-Prozess nie beenden).
-    process.off("SIGINT", onAbortSignal);
-    process.off("SIGTERM", onAbortSignal);
     // Auch nach einem Abbruch: Punkte, die nie aufgezeichnet wurden, zaehlen als „nichts gemessen“.
     abschluss();
     // Build-Herkunft-Warnung ("ungeklaert") gehoert in die Abschlusszeile, nicht nur nach oben

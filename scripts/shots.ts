@@ -27,7 +27,7 @@
 
 import { argv, cwd, exit } from "node:process";
 
-import { Cdp, attachTo, pollUntil, requireVisible } from "../../tools/obsidian-cdp/cdp.js";
+import { Cdp, attachTo, requireUntil, requireVisible } from "../../tools/obsidian-cdp/cdp.js";
 import { startLlmStub, type LlmStub } from "../../tools/obsidian-cdp/llm-stub.js";
 import { capture, setWindowSize, writeShot, type Rect } from "../../tools/obsidian-cdp/shot.js";
 import { buildVault, stagingVaultDir } from "../../tools/obsidian-cdp/vault.js";
@@ -199,7 +199,7 @@ async function main(): Promise<void> {
     settingsWin = await openSettings(ws, port);
     await setWindowSize(settingsWin, breite ?? WINDOW.width, WINDOW.height);
     await new Promise((r) => setTimeout(r, 2500));   // Statusleuchten kommen asynchron
-    await pollUntil<string>(settingsWin, `return document.querySelector(".lem-cap") ? "ok" : null;`, 15_000, 250);
+    await requireUntil(settingsWin, `document.querySelector(".lem-cap")`, "Die Einstellungen zeigen .lem-cap nicht", 15_000, 250);
 
     if (explore) {
       const png = await capture(settingsWin, undefined, 1);
