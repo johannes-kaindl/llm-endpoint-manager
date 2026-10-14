@@ -104,6 +104,8 @@ The contract is vendored into `src/vendor/kit/endpoint-source.ts` (from `obsidia
 
 ### Security boundary
 
+**Trust model.** Any installed plugin can call `resolve("chat")` and receive an endpoint together with its token, without asking you first. The `caller` name a plugin passes is self-declared and not verified; the "Consumers" list in the settings only shows what plugins claim. Install plugins you trust, as you would for any plugin that can read your vault.
+
 **Tokens never cross the API.** `list()` and `get()` return an `ApiEndpoint` with a boolean `hasSecret` flag only — the token value itself is not part of that shape (`toApiEndpoint` in `src/core/api.ts` builds the object field by field and never touches `secretId`/`apiKey`). Only `resolve()` and `materialize()` hand back a `ResolvedEndpoint` whose `config` carries the token — and only to a caller that explicitly asked to send a request to that endpoint, at the moment it needs it, never as part of a listing.
 
 ## Contributing
