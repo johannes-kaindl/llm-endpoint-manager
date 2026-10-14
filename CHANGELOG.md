@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-10-14
+
 ### Fixed
 
 - API: a `"changed"` listener that subscribes again while it is being called (for example one that re-subscribes on every redraw) is no longer called a second time in the same round. Before, such a listener looped endlessly.
