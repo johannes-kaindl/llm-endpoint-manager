@@ -48,7 +48,10 @@ export function importEndpoints(
     if (found) {
       if (!found.capabilities.includes(cap)) found.capabilities.push(cap);
       const sid = found.secretId ?? secretIdOf(found.id);
-      if (token && !hasSecret(sid)) { secrets.push({ secretId: sid, value: token }); found.secretId = sid; }
+      // Liegt unter der Standard-ID schon ein Token, ohne dass der Eintrag darauf zeigt, wird es wieder verknüpft
+      // (sonst bliebe es verwaist und der Eintrag ohne Token); ein mitgebrachtes Token überschreibt nie.
+      if (hasSecret(sid)) found.secretId = sid;
+      else if (token) { secrets.push({ secretId: sid, value: token }); found.secretId = sid; }
       result.merged.push(found.label);
       continue;
     }

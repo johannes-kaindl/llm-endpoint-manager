@@ -91,7 +91,7 @@ export function createManagerApi(deps: ApiDeps): ManagerApiHandle {
       const m = materialize(e, token);
       if ("error" in m) return m;
       const key = normalizeEndpoint(e.url);
-      if (opts?.force) models.invalidate(key);
+      if (opts?.force) { models.invalidate(key); reachability.invalidate(e.url); }
       const r = await models.load(key, {
         listModels: () => deps.listModels(m, e.provider).catch(() => []),
         probe: () => safeProbe(m).then((reachable) => ({ reachable })),
@@ -107,7 +107,7 @@ export function createManagerApi(deps: ApiDeps): ManagerApiHandle {
       // der den Wert nicht persistiert; ein Konsument, der laut Vertrag "error" in result statt
       // try/catch prüft, darf das nie als unbehandelte Rejection sehen.
       await deps.replaceSettings(toPersisted({ version: 1, endpoints: out.endpoints }));
-      for (const e of out.endpoints) reachability.invalidate(e.url);
+      for (const e of out.endpoints) { reachability.invalidate(e.url); models.invalidate(normalizeEndpoint(e.url)); }
       // Erst NACH dem Secret-Schreiben melden: ein synchroner „changed“-Listener, der sofort
       // `list()`/`get()` ruft, soll `hasSecret` des gerade importierten Endpunkts schon sehen.
       try {

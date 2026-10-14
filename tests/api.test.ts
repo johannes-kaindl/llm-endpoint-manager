@@ -60,6 +60,23 @@ describe("createManagerApi", () => {
     expect(listModels).toHaveBeenCalledTimes(2);
     expect(await api.models("nope")).toEqual({ error: "not-found" });
   });
+  it("models(force) verwirft auch die Erreichbarkeit der URL, damit resolve() nicht bis zu 30 s bei no-endpoint bleibt", async () => {
+    const { d, probe } = deps(base());
+    probe.mockResolvedValueOnce(false);
+    const { api } = createManagerApi(d);
+    expect(await api.resolve("chat")).toEqual({ error: "no-endpoint" });   // a: nicht erreichbar, im Cache; b: secret fehlt
+    await api.models("a", { force: true });
+    expect(await api.resolve("chat")).toMatchObject({ id: "a" });
+  });
+  it("importEndpoints verwirft die Modell-Liste eines zusammengeführten Endpunkts", async () => {
+    const { d, listModels } = deps(base());
+    const { api } = createManagerApi(d);
+    await api.models("a");
+    expect(listModels).toHaveBeenCalledTimes(1);
+    await api.importEndpoints([{ url: "http://a", apiKey: "neu" }], "chat");
+    await api.models("a");
+    expect(listModels).toHaveBeenCalledTimes(2);
+  });
   it("importEndpoints schreibt Zustand und Secrets und feuert changed", async () => {
     const { d, secrets, replaceSettings, current } = deps(base());
     const h = createManagerApi(d);

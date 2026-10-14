@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Import by another plugin: a token that already sits in the keychain under the endpoint's standard name is linked to the merged endpoint again instead of staying orphaned (the endpoint showed "no token" although one existed). A token that comes with the import never overwrites an existing one.
+- Import by another plugin: the model list of a merged endpoint is dropped, so a new token no longer leaves the old (empty) list in place.
+- `models(id, { force: true })` also forgets the cached reachability of that endpoint; `resolve()` no longer keeps answering "no endpoint" for up to 30 seconds while the model list already shows models.
+- Settings: when another plugin imports endpoints while the tab is open, the list updates by itself.
+
 ### Changed
 
 - Settings, endpoint list: the row of the endpoint a plugin would get for chat now reads "active" instead of "reachable, position 1". It follows the same rule as the API call `resolve` (first enabled, reachable endpoint with a usable token); the rows below it keep "reachable, position N".

@@ -44,6 +44,8 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
   private cleanupPrevious: () => void = () => {};
   /** Probe-Ergebnisse der Zeilen im aktuellen Render (normalisierte URL → erreichbar) und die laufenden
    *  Proben. Daraus bestimmt `active()` die Zeile, die `resolve("chat")` gerade bekäme. */
+  private ownSaves = 0;
+  private unsubscribeChanged: () => void = () => {};
   private rowReach = new Map<string, boolean>();
   private rowProbes = new Map<string, Promise<unknown>>();
 
@@ -68,6 +70,8 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
         { name: t("set.groupConsumers"), desc: t("set.consumersDesc"), render: (s) => { this.renderConsumers(s); } },
       ] },
     ];
+    // Der Cast ist bewusst: `SettingDefinition` aus obsidian.d.ts kennt kein `render`, der Walker des Kits
+    // (`renderSettingDefinitions`) liest es aber, und `helpSettingDefinition` liefert dasselbe Format.
     return defs as unknown as SettingDefinitionItem[];
   }
 
@@ -76,6 +80,7 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
   }
 
   hide(): void {
+    this.unsubscribeChanged();
     this.contextCache.clear();
     this.modelLists.clear();   // Kit-Vertrag: sonst bleibt „nicht erreichbar" für die Sitzung stehen
   }
@@ -131,8 +136,8 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
     return {
       available: this.plugin.keychain,
       has: (cfg) => cfg.secretId !== undefined && this.plugin.secrets.has(cfg.secretId),
-      set: (cfg, _i, value) => this.plugin.setSecret(cfg, value),
-      clear: (cfg) => this.plugin.clearSecret(cfg),
+      set: (cfg, _i, value) => this.own(() => this.plugin.setSecret(cfg, value)),
+      clear: (cfg) => this.own(() => this.plugin.clearSecret(cfg)),
     };
   }
 
@@ -170,24 +175,41 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
     };
   }
 
+  /** Die Liste des Kit-Editors wird übernommen; entfernte Einträge gehen über denselben Weg wie
+   *  `plugin.removeEndpoint` (`forgetEndpoint`: Token und Zwischenspeicher), die Liste kennt den Schlüsselbund nicht. */
+  private applyEndpointList(eps: ManagedEndpoint[]): void {
+    const kept = new Set(eps.map((e) => e.id));
+    for (const old of this.plugin.settings.endpoints) {
+      if (old.id && !kept.has(old.id)) this.plugin.forgetEndpoint(old);
+    }
+    this.plugin.settings.endpoints = this.complete(eps);
+  }
+
+  /** Eigene Speicherung dieses Tabs: `saveSettings` meldet „changed“ synchron, der Tab soll darauf nicht
+   *  neu zeichnen (er hat die Änderung selbst gemacht, ein Neuzeichnen risse das Eingabefeld weg). */
+  private async own<T>(fn: () => Promise<T>): Promise<T> {
+    this.ownSaves++;
+    try { return await fn(); } finally { this.ownSaves--; }
+  }
+
+  /** Ein Nachbarplugin importiert Endpunkte, während der Tab offen ist: die Liste zieht nach. */
+  private watchChanges(): void {
+    this.unsubscribeChanged();
+    this.unsubscribeChanged = this.plugin.api.on("changed", () => { if (this.ownSaves === 0) this.refreshUi(); });
+  }
+
   private renderEndpoints(setting: Setting): void {
     this.rowReach.clear(); this.rowProbes.clear();
+    this.watchChanges();
     buildEndpointList<ManagedEndpoint>({
       containerEl: settingBodyHost(setting),
       label: t("set.endpoints"), desc: t("set.endpointsDesc"), placeholder: "http://localhost:1234",
       strings: this.endpointStrings(), cache: this.modelLists,
       get: () => this.plugin.settings.endpoints,
-      set: (eps) => {
-        // Entfernte Einträge nehmen ihr Token mit; die Liste selbst kennt den Schlüsselbund nicht.
-        const kept = new Set(eps.map((e) => e.id));
-        for (const old of this.plugin.settings.endpoints) {
-          if (old.id && !kept.has(old.id)) { if (old.secretId) this.plugin.secrets.delete(old.secretId); this.plugin.handle.invalidateUrl(old.url); }
-        }
-        this.plugin.settings.endpoints = this.complete(eps);
-      },
+      set: (eps) => { this.applyEndpointList(eps); },
       active: () => firstActiveUrl(this.plugin.settings.endpoints, "chat", (u) => this.rowReach.get(u), (sid) => this.plugin.secrets.get(sid)),
       clientFor: (cfg) => this.rowClient(cfg),
-      save: () => this.plugin.saveSettings(),
+      save: () => this.own(() => this.plugin.saveSettings()),
       reconnect: async () => { this.plugin.handle.reachability.clear(); },
       rerender: () => { this.refreshUi(); },
       presets: PRESETS.map((p) => ({ label: p.label, url: p.url })),
@@ -214,7 +236,7 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
       if (!target) return;
       mutate(target);
       this.plugin.handle.invalidateUrl(target.url);
-      await this.plugin.saveSettings();
+      await this.own(() => this.plugin.saveSettings());
     };
     new Setting(host).setName(t("row.label")).addText((tx) => {
       tx.setValue(cfg.label);
@@ -359,7 +381,7 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
       if (!target) return;
       const updated = setModelMeta(target, row.id, patch);
       if (updated.models) target.models = updated.models; else delete target.models;
-      await this.plugin.saveSettings();
+      await this.own(() => this.plugin.saveSettings());
     };
     const setting = new Setting(host).setName(row.id);
     setting.addDropdown((d) => {
@@ -394,7 +416,7 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
     const target = this.plugin.settings.endpoints.find((e) => e.id === id);
     if (!target) return;
     if (backend) target.backend = backend; else delete target.backend;
-    await this.plugin.saveSettings();
+    await this.own(() => this.plugin.saveSettings());
   }
 
   /** `capabilityFetch` fragt nur `/api/config`, `/api/show`, `/api/v1/models`, `/api/v0/models`

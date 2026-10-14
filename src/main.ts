@@ -73,11 +73,17 @@ export default class LlmEndpointManagerPlugin extends Plugin {
     await this.saveSettings();
   }
 
+  /** Gemeinsamer Teil jedes Entfernens (UI-Liste und `removeEndpoint`): das Token geht mit, die
+   *  Zwischenspeicher der URL werden geleert. Die Liste selbst ändert der Aufrufer. */
+  forgetEndpoint(ep: ManagedEndpoint): void {
+    if (ep.secretId) this.secrets.delete(ep.secretId);
+    this.handle.invalidateUrl(ep.url);
+  }
+
   async removeEndpoint(id: string): Promise<void> {
     const target = this.settings.endpoints.find((e) => e.id === id);
     if (!target) return;
-    if (target.secretId) this.secrets.delete(target.secretId);
-    this.handle.invalidateUrl(target.url);
+    this.forgetEndpoint(target);
     this.settings.endpoints = this.settings.endpoints.filter((e) => e.id !== id);
     await this.saveSettings();
   }

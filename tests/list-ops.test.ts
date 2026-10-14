@@ -52,6 +52,12 @@ describe("importEndpoints", () => {
     expect(out.secrets).toEqual([{ secretId: "llm-endpoint-manager-ida", value: "neu" }]);
     expect(out.endpoints[0]?.secretId).toBe("llm-endpoint-manager-ida");
   });
+  it("verknüpft ein Token unter der Standard-ID wieder, wenn der Eintrag kein secretId trägt, und überschreibt es nie", () => {
+    const existing = [ep({ url: "http://a", id: "idA" })];
+    const out = importEndpoints(existing, [{ url: "http://a", apiKey: "neu" }], "chat", mint, (sid) => sid === "llm-endpoint-manager-ida");
+    expect(out.endpoints[0]?.secretId).toBe("llm-endpoint-manager-ida");
+    expect(out.secrets).toEqual([]);
+  });
   it("überspringt leere URLs und Duplikate innerhalb der Eingabe", () => {
     const out = importEndpoints([], [{ url: " " }, { url: "http://b" }, { url: "http://b/" }], "chat", mint, () => false);
     expect(out.result.added).toEqual(["b"]);

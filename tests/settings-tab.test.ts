@@ -272,3 +272,31 @@ describe("LlmEndpointManagerSettingTab", () => {
     expect(settings.some((s) => s.components.some((c) => c instanceof DropdownComponent && Object.keys((c as DropdownComponent).options).includes("gpt-oss")))).toBe(false);
   });
 });
+
+describe("Entfernen und Nachziehen im Endpunkt-Tab", () => {
+  it("Entfernen über den Listenpfad nimmt Token und Zwischenspeicher mit (derselbe Weg wie removeEndpoint)", async () => {
+    const { tab: t, plugin } = await tab({ endpoints: [
+      { id: "e1", label: "A", url: "http://a", capabilities: ["chat"], secretId: "llm-endpoint-manager-e1" },
+      { id: "e2", label: "B", url: "http://b", capabilities: ["chat"] },
+    ] });
+    plugin.secrets.set("llm-endpoint-manager-e1", "tok");
+    (t as unknown as { applyEndpointList(eps: unknown[]): void }).applyEndpointList([plugin.settings.endpoints[1]]);
+    expect(plugin.secrets.get("llm-endpoint-manager-e1")).toBeNull();
+    expect(plugin.settings.endpoints.map((e) => e.id)).toEqual(["e2"]);
+  });
+  it("zeichnet die Liste neu, wenn ein Nachbar importiert, nicht bei der eigenen Speicherung; hide beendet das Abo", async () => {
+    const { tab: t, plugin } = await tab({ endpoints: [{ id: "e1", label: "A", url: "http://a", capabilities: ["chat"] }] });
+    let renders = 0;
+    (t as unknown as { refreshUi: () => void }).refreshUi = () => { renders++; };
+    (t as unknown as { watchChanges(): void }).watchChanges();
+    await plugin.api.importEndpoints([{ url: "http://c" }], "chat");
+    const nachImport = renders;
+    expect(nachImport).toBeGreaterThan(0);
+    await (t as unknown as { own<T>(f: () => Promise<T>): Promise<T> }).own(() => plugin.saveSettings());
+    expect(renders).toBe(nachImport);
+    t.hide();
+    await plugin.api.importEndpoints([{ url: "http://d" }], "chat");
+    expect(renders).toBe(nachImport);
+  });
+});
+
