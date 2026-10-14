@@ -68,6 +68,8 @@ tests/vendor/kit/     vendorter Obsidian-Mock (obsidian-mock.ts)
 
 ## Gotchas
 
+- **Ein `api.on("changed")`-Listener abonniert einmal, nicht bei jedem Neuzeichnen.** `notifyChanged` iteriert über eine Kopie der Listener (seit 0.8.0); vorher lief ein Listener, der beim Melden neu abonnierte (Unsubscribe plus `on`), in eine Endlosschleife (Renderer 108 % CPU, Smoke-Timeout, Welle 22). Der Settings-Tab abonniert deshalb in `watchChanges()` nur, wenn noch kein Abo steht; eigene Speicherungen des Tabs laufen über `own()`, damit sie ihn nicht neu zeichnen.
+
 - Secret-IDs dürfen nur `[a-z0-9-]` enthalten (Obsidian-Schlüsselbund-Konvention aus
   `obsidian-kit`/`secrets.ts`).
 - `tools/sync-kit.sh` bricht ohne `set -e`-Fallback gezielt ab, wenn `KIT_REF`/`CODE_KIT_REF`
