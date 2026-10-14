@@ -67,7 +67,7 @@ export function createManagerApi(deps: ApiDeps): ManagerApiHandle {
   };
   const safeProbe = (m: Materialized): Promise<boolean> => deps.probe(m, m.ep.provider).catch(() => false);
   const find = (id: string): ManagedEndpoint | undefined => deps.settings().endpoints.find((e) => e.id === id);
-  const notifyChanged = (): void => { for (const cb of listeners) { try { cb(); } catch { /* Fremd-Callback */ } } };
+  const notifyChanged = (): void => { for (const cb of [...listeners]) { try { cb(); } catch { /* Fremd-Callback */ } } };
 
   const api: LlmEndpointManagerApi = {
     version: LLM_ENDPOINT_MANAGER_API_VERSION,

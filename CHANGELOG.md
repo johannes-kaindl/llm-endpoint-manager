@@ -8,6 +8,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- API: a `"changed"` listener that subscribes again while it is being called (for example one that re-subscribes on every redraw) is no longer called a second time in the same round. Before, such a listener looped endlessly.
 - Import by another plugin: a token that already sits in the keychain under the endpoint's standard name is linked to the merged endpoint again instead of staying orphaned (the endpoint showed "no token" although one existed). A token that comes with the import never overwrites an existing one.
 - Import by another plugin: the model list of a merged endpoint is dropped, so a new token no longer leaves the old (empty) list in place.
 - `models(id, { force: true })` also forgets the cached reachability of that endpoint; `resolve()` no longer keeps answering "no endpoint" for up to 30 seconds while the model list already shows models.

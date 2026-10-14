@@ -77,6 +77,18 @@ describe("createManagerApi", () => {
     await api.models("a");
     expect(listModels).toHaveBeenCalledTimes(2);
   });
+  it("ein changed-Listener, der beim Melden neu abonniert, wird je Meldung genau einmal gerufen", async () => {
+    const { d } = deps(base());
+    const h = createManagerApi(d);
+    let calls = 0;
+    let off = (): void => {};
+    const cb = (): void => { calls++; if (calls > 50) throw new Error("Endlosschleife"); off(); off = h.api.on("changed", cb); };
+    off = h.api.on("changed", cb);
+    h.notifyChanged();
+    expect(calls).toBe(1);
+    h.notifyChanged();
+    expect(calls).toBe(2);
+  });
   it("importEndpoints schreibt Zustand und Secrets und feuert changed", async () => {
     const { d, secrets, replaceSettings, current } = deps(base());
     const h = createManagerApi(d);
