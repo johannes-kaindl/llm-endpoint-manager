@@ -1,4 +1,4 @@
-// vendored from code-kit@0.24.0, src/ts/pure/sampling-profiles.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from code-kit@0.27.1, src/ts/pure/sampling-profiles.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 /** Request profiles for local and hosted LLM backends: which sampling values, which
  *  reasoning_effort and which minimum token budget a plugin sends, per model family × mode,
  *  and which of those fields a backend actually honours.
@@ -167,7 +167,7 @@ export const BACKENDS: Record<BackendId, BackendProfile> = {
   unknown: { label: "unknown", fields: STANDARD_ONLY, source: "unknown backend: standard fields only" },
 };
 
-const FAMILY_PATTERNS: readonly [RegExp, FamilyId][] = [
+export const FAMILY_PATTERNS: readonly [RegExp, FamilyId][] = [
   [/qwen3\.8/i, "qwen3.8"],
   [/qwen3\.6/i, "qwen3.6"],
   [/gemma[-_]?4/i, "gemma4"],
@@ -230,8 +230,8 @@ export interface FieldExplain {
 }
 export interface ResolvedRequest { params: Record<string, number | string>; explain: FieldExplain[] }
 
-const GENERIC_EFFORT: Record<ThinkingLevel, string> = { off: "none", low: "low", medium: "medium", high: "high" };
-const FAMILY_FIELDS: readonly FamilyField[] = ["top_p", "top_k", "min_p", "presence_penalty"];
+export const GENERIC_EFFORT: Record<ThinkingLevel, string> = { off: "none", low: "low", medium: "medium", high: "high" };
+export const FAMILY_FIELDS: readonly FamilyField[] = ["top_p", "top_k", "min_p", "presence_penalty"];
 
 interface Candidate { value: number | string; origin: FieldOrigin; source?: string; evidence?: Evidence; note?: FieldNote }
 
@@ -327,7 +327,7 @@ export interface RequestSettings {
 }
 export const DEFAULT_REQUEST_SETTINGS: RequestSettings = { overrides: {}, thinking: {}, lastOnLevel: {}, levelPickerInChat: false };
 
-const RANGES: Record<Exclude<FieldId, "reasoning_effort">, { min: number; max: number; int: boolean }> = {
+export const RANGES: Record<Exclude<FieldId, "reasoning_effort">, { min: number; max: number; int: boolean }> = {
   temperature: { min: 0, max: 2, int: false },
   top_p: { min: 0.1, max: 1, int: false },   // measured: top_p <= 0.05 yields garbage on LM Studio (llm-setup 6f75737)
   top_k: { min: 1, max: Number.MAX_SAFE_INTEGER, int: true },
@@ -335,7 +335,7 @@ const RANGES: Record<Exclude<FieldId, "reasoning_effort">, { min: number; max: n
   presence_penalty: { min: 0, max: 2, int: false },
   max_tokens: { min: 1, max: Number.MAX_SAFE_INTEGER, int: true },
 };
-const EFFORT_VALUES = new Set(["none", "minimal", "low", "medium", "high", "xhigh"]);
+export const EFFORT_VALUES = new Set(["none", "minimal", "low", "medium", "high", "xhigh"]);
 
 export function validateOverride(field: FieldId, raw: unknown): number | string | null {
   if (field === "reasoning_effort") return typeof raw === "string" && EFFORT_VALUES.has(raw) ? raw : null;
@@ -362,7 +362,7 @@ function levelMap(raw: unknown, path: string, dropped: string[]): Partial<Record
 }
 
 /** Validates the plugin's `request` block field by field. Invalid values fall back to the
- *  profile and are reported in `dropped` — never silently discarded (CORE-DATA-01). */
+ *  profile and are reported in `dropped` (sorted) — never silently discarded (CORE-DATA-01). */
 export function sanitizeRequestSettings(raw: unknown): { settings: RequestSettings; dropped: string[] } {
   const dropped: string[] = [];
   // Frische Objekte, nie DEFAULT_REQUEST_SETTINGS selbst: der Aufrufer mutiert das Ergebnis.
@@ -387,6 +387,8 @@ export function sanitizeRequestSettings(raw: unknown): { settings: RequestSettin
   let levelPickerInChat = false;
   if (typeof raw.levelPickerInChat === "boolean") levelPickerInChat = raw.levelPickerInChat;
   else if (raw.levelPickerInChat !== undefined) dropped.push("levelPickerInChat");
+  // Sorted, not in input key order: a port in another language (Lua) cannot see that order, and the list is only shown.
+  dropped.sort();
   return { settings: { overrides, thinking, lastOnLevel, levelPickerInChat }, dropped };
 }
 

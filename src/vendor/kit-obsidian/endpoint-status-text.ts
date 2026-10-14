@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.59.1, src/obsidian/endpoint-status-text.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.60.1, src/obsidian/endpoint-status-text.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 /** Texte (EN/DE) für den Status einer Endpunkt-Zeile und für die Eingabe-Hinweise — ohne die
  *  Verbindung, die Endpunkt-Liste oder ein Bündel dahinter.
  *

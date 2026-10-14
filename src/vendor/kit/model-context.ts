@@ -1,4 +1,4 @@
-// vendored from code-kit@0.24.0, src/ts/pure/model-context.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from code-kit@0.27.1, src/ts/pure/model-context.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 import type { CapabilityFetch } from "./capabilities";
 import { withTimeout, type TimeoutTimers } from "./timeout";
 
@@ -97,4 +97,36 @@ export async function fetchModelContext(
     }
   } catch { /* nobody reports a window */ }
   return null;
+}
+
+/** The context window a model NAME announces, or `null`. The convention comes from ONE operator (`gpt-oss:120b-ctx128k`,
+ *  `gemma4:31b-ctx128k`): the suffix `-ctxNNNk` names the window the model is loaded with there. It is a heuristic over a
+ *  name, not a protocol — it yields a hint, never a value to store silently.
+ *
+ *  `NNN` is one to four digits; `k` counts 1024 (`128k` → 131072, the Ollama `num_ctx`, not 128000), so that the hint raises no
+ *  false alarm for the two common settings 128000 and 131072. The suffix must be followed by the end of the name or a
+ *  character that is neither letter nor digit (`-ctx32k:latest`, `-ctx32k-q4`, `-ctx32k.gguf` count; `-ctx128kb`, `-ctx128k2`
+ *  do not). Case-insensitive; the first suffix wins. `0k` is no hint.
+ *
+ *  Origin: koda-agent `src/core/llm/context-hint.ts:7` (n = 1; its header asked for a home "next to `guessFromName`", and
+ *  that function is about thinking and vision, this file about the window). Welle 22, Teil 2.
+ *
+ *  @example contextHintFromModelName("gpt-oss:120b-ctx128k") // → 131072 */
+export function contextHintFromModelName(name: string | undefined): number | null {
+  if (name === undefined) return null;
+  const m = /-ctx(\d{1,4})k(?![a-z0-9])/i.exec(name);
+  if (m === null) return null;
+  const k = parseInt(m[1] ?? "", 10);
+  return k > 0 ? k * 1024 : null;
+}
+
+/** The smallest hint below `current`, else `null`. Warns only downwards: a window at the model that is larger than the
+ *  setting costs at most some utilisation, a smaller one lets the plugin send more than the model takes. `null`, `undefined`,
+ *  zero and negative candidates are ignored. Origin: koda-agent `src/core/llm/context-hint.ts:22`. */
+export function lowerContextHint(current: number, candidates: ReadonlyArray<number | null | undefined>): number | null {
+  let min: number | null = null;
+  for (const c of candidates) {
+    if (typeof c === "number" && c > 0 && c < current && (min === null || c < min)) min = c;
+  }
+  return min;
 }

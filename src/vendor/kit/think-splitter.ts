@@ -1,4 +1,4 @@
-// vendored from code-kit@0.24.0, src/ts/pure/think-splitter.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from code-kit@0.27.1, src/ts/pure/think-splitter.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 const OPEN = "<think>";
 const CLOSE = "</think>";
 

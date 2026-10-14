@@ -9,6 +9,7 @@ All notable changes to this project are documented here. The format follows
 ### Changed
 
 - Settings, endpoint list: the row of the endpoint a plugin would get for chat now reads "active" instead of "reachable, position 1". It follows the same rule as the API call `resolve` (first enabled, reachable endpoint with a usable token); the rows below it keep "reachable, position N".
+- Kit pins raised to `obsidian-kit` 0.60.1 and `code-kit` 0.27.1 (from 0.59.1 and 0.24.0). Of the skipped releases (obsidian-kit 0.60.0, 0.60.1; code-kit 0.25.0, 0.26.0, 0.27.0, 0.27.1) nothing reaches this plugin visibly: the endpoint list only had its internals tidied, `sampling-profiles` lists dropped request settings sorted instead of in stored order (order of a warning only), and the new error texts per manager code, `tool-provider`, share export, plugin-ID check and thinking button do not apply to the plugin that is the source of the endpoints. The plugin API stays at version 1 and the `ApiErrorCode` values are unchanged.
 
 ## [0.7.0] — 2026-10-12
 

@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.59.1, src/pure/endpoint-source.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.60.1, src/pure/endpoint-source.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 import { hydrateEndpointSecrets, resolveActiveEndpointConfig, type EndpointConfig } from "./endpoint_config";
 import type { SecretStore } from "./secrets";
 import { familyFromName, type BackendId, type FamilyId, type ModelFamilyId } from "./sampling-profiles";
@@ -201,7 +201,14 @@ export async function resolveEndpointSource(
       reason = m.error;   // verwaiste Wahl → automatisch weiter, Grund mitteilen
     }
     const r = await manager.resolve(input.capability, opts);
-    if ("error" in r) return finish({ kind: "manager", config: null, model: "", reason: r.error }, input, null);
+    if ("error" in r) {
+      // Der Manager-`resolve` kennt nur `no-endpoint` (er überspringt abgeschaltete und schlüssellose Endpunkte still).
+      // Hat der Nutzer einen Endpunkt ausdrücklich gewählt und DER scheiterte an etwas, das er abstellen kann, ist das
+      // der Grund, den er braucht — „kein Endpunkt“ schickte ihn an die falsche Stelle (Welle 22). `not-found` bleibt
+      // überschrieben: eine verwaiste Wahl ist nur weg, daran ist nichts zu beheben.
+      const fixable = reason === "disabled" || reason === "secret-missing" ? reason : undefined;
+      return finish({ kind: "manager", config: null, model: "", reason: fixable ?? r.error }, input, null);
+    }
     const base = { kind: "manager" as const, config: r.config, model: modelOf(input.choice, r.defaultModel), ...(reason ? { reason } : {}) };
     return finish(base, input, r);
   } catch {

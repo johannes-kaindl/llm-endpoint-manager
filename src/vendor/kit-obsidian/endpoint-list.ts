@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.59.1, src/obsidian/endpoint-list.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.60.1, src/obsidian/endpoint-list.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 /* Geordneter Endpunkt-Fallback-Listen-Editor: eine Setting-Zeile je Endpunkt (URL ·
  * Schlüssel · Modell-Override · „zuerst verwenden" · entfernen) plus Adder-Zeile,
  * Status-Icon, Rollenzeile, Drittanbieter-Hinweis und Preset-Knöpfe.
@@ -184,6 +184,8 @@ export function buildEndpointList<T extends EndpointConfig = EndpointConfig>(opt
   new Setting(opts.containerEl).setName(opts.label).setDesc(opts.desc);
 
   rows.forEach((cfg, i) => {
+    // Der Eintrag dieser Zeile, frisch gelesen (Commits ersetzen die Liste). Nicht-Adder-Zeile: `cfg` stammt aus `eps` (T), nur die Adder-Zeile ist kein T.
+    const currentOf = (): T => opts.get()[i] ?? (cfg as T);
     const isAdder = i >= eps.length;
     const s = new Setting(opts.containerEl);
     s.settingEl.addClass("okit-ep-row");
@@ -267,7 +269,7 @@ export function buildEndpointList<T extends EndpointConfig = EndpointConfig>(opt
     // Felder in einer Zeile sind für Screenreader nicht auseinanderzuhalten.
     if (!isAdder && secret) {
       const hook = secret;
-      const current = opts.get()[i] ?? (cfg as T);   // nicht-Adder-Zeile: cfg stammt aus `eps` (T), nur die Adder-Zeile ist kein T
+      const current = currentOf();
       const st = opts.strings;
       const afterSecret = (): void => {
         lockRows();
@@ -342,7 +344,7 @@ export function buildEndpointList<T extends EndpointConfig = EndpointConfig>(opt
       const modelSlot = tailEl.createSpan({ cls: "okit-model-slot" });
       const listKey = normalizeEndpoint(cfg.url);
       const gen = opts.cache.generation();
-      void opts.cache.load(listKey, opts.clientFor(opts.get()[i] ?? (cfg as T))).then(({ models, reachable }) => {
+      void opts.cache.load(listKey, opts.clientFor(currentOf())).then(({ models, reachable }) => {
         if (gen !== opts.cache.generation()) return;   // Liste hat sich verschoben
         // Das Zeilen-Modell ist die einzige Wahrheit (kein globales Modell-Feld seit 0.55.0). Die Leer-Option
         // bleibt trotzdem: sie heißt nicht „nimm das globale“, sondern „der Server wählt“ — sonst ließe sich ein
@@ -361,7 +363,7 @@ export function buildEndpointList<T extends EndpointConfig = EndpointConfig>(opt
           savedSuffix: opts.strings.savedSuffix,
           refreshTooltip: opts.strings.refreshModels,
           onPick: (v: string) => { commit("model", v); },
-          onRefresh: () => { opts.cache.invalidate(listKey); opts.modelContext?.invalidate?.(opts.get()[i] ?? (cfg as T)); opts.rerender(); },
+          onRefresh: () => { opts.cache.invalidate(listKey); opts.modelContext?.invalidate?.(currentOf()); opts.rerender(); },
         });
       });
     }
@@ -427,7 +429,7 @@ export function buildEndpointList<T extends EndpointConfig = EndpointConfig>(opt
         const isActive = normalizeEndpoint(ep) === (opts.active() ?? "");
         // Den Eintrag frisch aus der Liste lesen, nicht das `cfg` vom Render-Zeitpunkt:
         // nach einem Modell-Commit trägt nur die Liste den neuen Wert.
-        const current = opts.get()[i] ?? (cfg as T);   // nicht-Adder-Zeile: cfg stammt aus `eps` (T), nur die Adder-Zeile ist kein T
+        const current = currentOf();
         const role = endpointRole({
           isActive,
           reachable: probed.reachable,
@@ -439,7 +441,7 @@ export function buildEndpointList<T extends EndpointConfig = EndpointConfig>(opt
         stateEl.toggleClass("is-active", role.kind === "active");
       };
       syncRoleLine = applyRole;
-      void opts.clientFor(opts.get()[i] ?? (cfg as T)).probe().then(status => {
+      void opts.clientFor(currentOf()).probe().then(status => {
         statusIcon.empty();
         setIcon(statusIcon, status.reachable ? "circle-check" : "circle-x");
         statusIcon.toggleClass("is-ok", status.reachable);
@@ -451,7 +453,7 @@ export function buildEndpointList<T extends EndpointConfig = EndpointConfig>(opt
         applyRole();
         // Kontextlänge: nur für eine erreichbare Zeile mit Modell, erst nach der Probe (ein toter Endpunkt wird
         // sonst ein zweites Mal angefragt), und nur, wenn der Server überhaupt eine Zahl nennt.
-        const rowNow = opts.get()[i] ?? (cfg as T);
+        const rowNow = currentOf();
         const contextText = opts.strings.contextText;
         if (opts.modelContext && contextText && status.reachable && (rowNow.model ?? "").trim() !== "") {
           void opts.modelContext.load(rowNow).then((ctx) => {
@@ -472,11 +474,11 @@ export function buildEndpointList<T extends EndpointConfig = EndpointConfig>(opt
       // Sachlicher Hinweis, keine Warnung vor einem Fehler — Form/Icon + Text, nie Farbe allein
       // (WCAG 1.4.1); NIE den Schlüssel selbst im Text/Tooltip. syncThirdPartyIcon() hält das
       // danach auch beim apiKey-Commit aktuell (siehe dort), ohne den Tab neu zu bauen.
-      syncThirdPartyIcon(secret ? secret.has(opts.get()[i] ?? (cfg as T), i) : carriesApiKey(cfg));
+      syncThirdPartyIcon(secret ? secret.has(currentOf(), i) : carriesApiKey(cfg));
     }
     if (!isAdder && opts.extraRow) {
       const host = s.controlEl.createDiv({ cls: "okit-ep-extra" });
-      opts.extraRow(host, opts.get()[i] ?? (cfg as T), i);
+      opts.extraRow(host, currentOf(), i);
     }
   });
   const actions = new Setting(opts.containerEl);
