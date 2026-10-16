@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, beforeAll, afterAll } from "vitest";
 import { requestUrl } from "obsidian";
-import { listModels, loadModelContext, probeStatus } from "../src/obsidian/http";
+import { listModels, loadModelContext, probeHeaders, probeStatus } from "../src/obsidian/http";
 import { classifyEndpointStatus } from "../src/vendor/kit/endpoint_diagnostics";
 
 // Der vendorte Obsidian-Mock (tests/vendor/kit/obsidian-mock.ts) baut `requestUrl` mit einem
@@ -45,6 +45,26 @@ describe("probeStatus/listModels", () => {
     expect(lastCallArg()).toEqual(expect.objectContaining({ url: "http://h:1234/v1/models", headers: { Authorization: "Bearer tok" } }));
     rq.mockResolvedValue({ status: 200, text: JSON.stringify({ data: [{ id: "z" }, { id: "a" }] }) });
     expect(await listModels({ url: "http://h:1234" }, "openai", 100)).toEqual(["a", "z"]);
+  });
+  it("anthropic: GET /v1/models?limit=1000 mit x-api-key und anthropic-version, nie Authorization; Modelle sortiert", async () => {
+    rq.mockResolvedValue({ status: 200, text: JSON.stringify({ data: [{ id: "claude-sonnet-5-5" }, { id: "claude-haiku-5-5" }], has_more: false }) });
+    const st = await probeStatus({ url: "https://api.anthropic.com", apiKey: "sk-ant-x" }, "anthropic", 100);
+    expect(st.reachable).toBe(true);
+    expect(lastCallArg()).toEqual(expect.objectContaining({ url: "https://api.anthropic.com/v1/models?limit=1000", headers: { "x-api-key": "sk-ant-x", "anthropic-version": "2023-06-01" } }));
+    rq.mockResolvedValue({ status: 200, text: JSON.stringify({ data: [{ id: "claude-sonnet-5-5" }, { id: "claude-haiku-5-5" }] }) });
+    expect(await listModels({ url: "https://api.anthropic.com", apiKey: "k" }, "anthropic", 100)).toEqual(["claude-haiku-5-5", "claude-sonnet-5-5"]);
+  });
+  it("anthropic: ungültiger Schlüssel (401 mit Fehlerkörper) ist nicht erreichbar mit lesbarem Grund, kein Wurf", async () => {
+    rq.mockResolvedValue({ status: 401, text: JSON.stringify({ type: "error", error: { type: "authentication_error", message: "invalid x-api-key" } }) });
+    const st = await probeStatus({ url: "https://api.anthropic.com", apiKey: "falsch" }, "anthropic", 100);
+    expect(st.reachable).toBe(false);
+    expect(st.kind).toBe(classifyEndpointStatus({ kind: "response", status: 401, body: {} }).kind);
+    expect(await listModels({ url: "https://api.anthropic.com", apiKey: "falsch" }, "anthropic", 100)).toEqual([]);
+  });
+  it("probeHeaders: ohne Schlüssel kein x-api-key, andere Anbieter bleiben bei Bearer", () => {
+    expect(probeHeaders({ url: "https://api.anthropic.com" }, "anthropic")).toEqual({ "anthropic-version": "2023-06-01" });
+    expect(probeHeaders({ url: "http://h", apiKey: "t" }, "openai")).toEqual({ Authorization: "Bearer t" });
+    expect(probeHeaders({ url: "http://h", apiKey: "t" }, "ollama")).toEqual({ Authorization: "Bearer t" });
   });
   it("a1111: eigener Pfad, Titel als Modelle; comfy: erreichbar ohne Modelle", async () => {
     rq.mockResolvedValue({ status: 200, text: JSON.stringify([{ title: "sd" }]) });

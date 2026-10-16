@@ -1,6 +1,6 @@
 import { normalizeEndpoint } from "../vendor/kit/endpoint";
 import type { EndpointConfig } from "../vendor/kit/endpoint_config";
-import type { Capability, ManagedEndpoint } from "./model";
+import type { Capability, EndpointTransport, ManagedEndpoint } from "./model";
 
 export const REACHABILITY_TTL_MS = 30_000;
 
@@ -46,6 +46,16 @@ export function materialize(ep: ManagedEndpoint, token: (secretId: string) => st
   return { ep, config };
 }
 
+/** Welche Einträge `resolve()` von selbst wählen darf. Ein Eintrag ohne `transport` ist `http`; ohne Opt-in des Aufrufers
+ *  (`transports`) nur diese. `"anthropic"` kommt nur auf ausdrücklichen Wunsch dazu (Welle 23: ein älteres Plugin sieht den
+ *  Endpunkt nie, weder in `list()` noch hier). Ein Kurzbefehl-Endpunkt wird NIE automatisch gewählt, auch nicht mit Opt-in:
+ *  ein Plugin holt ihn über `list({ transports: ["shortcuts"] })` und `materialize(id)`. */
+export function autoResolvable(ep: ManagedEndpoint, transports?: EndpointTransport[]): boolean {
+  const own = ep.transport ?? "http";
+  if (own === "shortcuts") return false;
+  return (transports ?? ["http"]).includes(own);
+}
+
 /** Erster erreichbarer, aktivierter Eintrag mit der Fähigkeit, in Listenreihenfolge. Einträge mit
  *  fehlendem Token werden still übersprungen (kein Fehler — der Manager zeigt sie im Tab an). */
 /** `resolve()` des öffentlichen Vertrags kennt kein `transports`-Opt-in (anders als `list()`) —
@@ -59,9 +69,10 @@ export async function resolveFirst(
   cache: ReachabilityCache,
   probe: (m: Materialized) => Promise<boolean>,
   token: (secretId: string) => string | null,
+  transports?: EndpointTransport[],
 ): Promise<Materialized | { error: "no-endpoint" }> {
   for (const ep of eps) {
-    if (!ep.enabled || !ep.capabilities.includes(cap) || ep.transport === "shortcuts") continue;
+    if (!ep.enabled || !ep.capabilities.includes(cap) || !autoResolvable(ep, transports)) continue;
     const m = materialize(ep, token);
     if ("error" in m) continue;
     let reachable = cache.get(ep.url);
@@ -82,9 +93,10 @@ export function firstActiveUrl(
   cap: Capability,
   known: (url: string) => boolean | undefined,
   token: (secretId: string) => string | null,
+  transports?: EndpointTransport[],
 ): string | null {
   for (const ep of eps) {
-    if (!ep.enabled || !ep.capabilities.includes(cap) || ep.transport === "shortcuts") continue;
+    if (!ep.enabled || !ep.capabilities.includes(cap) || !autoResolvable(ep, transports)) continue;
     if ("error" in materialize(ep, token)) continue;
     const url = normalizeEndpoint(ep.url);
     if (known(url) === true) return url;

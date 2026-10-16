@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { DEFAULT_SETTINGS, labelFromUrl, loadSettings, normalizeEndpointEntry, secretIdOf, toPersisted } from "../src/core/model";
+import { DEFAULT_SETTINGS, labelFromUrl, loadSettings, normalizeEndpointEntry, secretIdOf, toPersisted, withProvider, type ManagedEndpoint } from "../src/core/model";
 
 const mint = (() => { let n = 0; return () => `id-${++n}`; })();
 
@@ -112,5 +112,28 @@ describe("transport und shortcut (apple-shortcuts)", () => {
     }] });
     expect(toPersisted(s).endpoints[0]!.transport).toBe("shortcuts");
     expect(toPersisted(s).endpoints[0]!.shortcut).toEqual({ name: "Ask On-Device Model (Obsidian)", timeoutMs: 30000 });
+  });
+});
+
+describe("Anbieter anthropic (Welle 23)", () => {
+  it("ein Eintrag mit provider anthropic trägt immer transport und backend anthropic, auch wenn die Datei sie nicht nennt oder falsch nennt", () => {
+    const a = normalizeEndpointEntry({ url: "https://api.anthropic.com", provider: "anthropic" }, () => "x");
+    expect([a?.provider, a?.transport, a?.backend]).toEqual(["anthropic", "anthropic", "anthropic"]);
+    const b = normalizeEndpointEntry({ url: "https://api.anthropic.com", provider: "anthropic", transport: "http", backend: "openai" }, () => "x");
+    expect([b?.transport, b?.backend]).toEqual(["anthropic", "openai"]);   // ein ausdrücklich gesetztes Backend bleibt, der Transport nicht
+  });
+  it("transport anthropic überlebt Laden und Speichern", () => {
+    const s = loadSettings({ endpoints: [{ id: "c", url: "https://api.anthropic.com", provider: "anthropic", capabilities: ["chat"] }] });
+    expect(toPersisted(s).endpoints[0]).toMatchObject({ provider: "anthropic", transport: "anthropic", backend: "anthropic" });
+  });
+  it("withProvider: anthropic setzt Transport und Backend, ein Wechsel zurück nimmt beide weg, ein fremdes Backend bleibt", () => {
+    const e: ManagedEndpoint = { id: "e", label: "E", url: "http://a", provider: "openai", capabilities: ["chat"], enabled: true, backend: "lmstudio" };
+    withProvider(e, "anthropic");
+    expect([e.provider, e.transport, e.backend]).toEqual(["anthropic", "anthropic", "anthropic"]);
+    withProvider(e, "openai");
+    expect([e.provider, e.transport, e.backend]).toEqual(["openai", undefined, undefined]);
+    const f: ManagedEndpoint = { id: "f", label: "F", url: "http://a", provider: "openai", capabilities: ["chat"], enabled: true, backend: "lmstudio", transport: "shortcuts" };
+    withProvider(f, "ollama");
+    expect([f.transport, f.backend]).toEqual(["shortcuts", "lmstudio"]);   // nur, was von anthropic stammt, fällt weg
   });
 });

@@ -3,6 +3,7 @@ import { Platform, requestUrl } from "obsidian";
 import { classifyEndpointStatus, type EndpointStatus } from "../vendor/kit/endpoint_diagnostics";
 import { normalizeEndpoint } from "../vendor/kit/endpoint";
 import { authHeaders, type EndpointConfig } from "../vendor/kit/endpoint_config";
+import { ANTHROPIC_VERSION } from "../vendor/kit/anthropic-wire";
 import { withTimeout } from "../vendor/kit/timeout";
 import type { CapabilityFetch } from "../vendor/kit/capabilities";
 import { fetchModelContext, type ModelContext } from "../vendor/kit/model-context";
@@ -44,6 +45,14 @@ export const capabilityFetch: CapabilityFetch = async (req) => {
   try { return { json: JSON.parse(res.text) }; } catch { return null; }
 };
 
+/** Kopfzeilen der Probe: Anthropic nimmt den Schlüssel in `x-api-key` und verlangt `anthropic-version` (ohne sie 401/400),
+ *  alle anderen Anbieter `Authorization: Bearer`. `requestUrl` läuft im Hauptprozess, der Browser-Header für CORS ist hier
+ *  nicht nötig (er gehört in den Transport der Plugins, die aus dem Renderer senden). */
+export function probeHeaders(cfg: EndpointConfig, provider: Provider): Record<string, string> {
+  if (provider !== "anthropic") return authHeaders(cfg.apiKey);
+  return { ...(cfg.apiKey ? { "x-api-key": cfg.apiKey } : {}), "anthropic-version": ANTHROPIC_VERSION };
+}
+
 function target(cfg: EndpointConfig, provider: Provider, probe: ReturnType<typeof providerProbe>): string {
   return `${normalizeEndpoint(cfg.url)}${probe?.path ?? ""}`;
 }
@@ -67,7 +76,7 @@ export function applePlatformStatus(): EndpointStatus {
 export async function probeStatus(cfg: EndpointConfig, provider: Provider, timeoutMs: number = PROBE_TIMEOUT_MS): Promise<EndpointStatus> {
   if (provider === "apple-shortcuts") return applePlatformStatus();
   const probe = providerProbe(provider);
-  const res = await send(target(cfg, provider, probe), timeoutMs, authHeaders(cfg.apiKey));
+  const res = await send(target(cfg, provider, probe), timeoutMs, probeHeaders(cfg, provider));
   if (res.timedOut) return classifyEndpointStatus({ kind: "timeout" });
   if (res.error !== null) return classifyEndpointStatus({ kind: "error", message: res.error });
   if (provider === "a1111" || provider === "comfy") {
@@ -94,7 +103,7 @@ export async function listModels(cfg: EndpointConfig, provider: Provider, timeou
   if (provider === "apple-shortcuts") return [];
   const probe = providerProbe(provider);
   if (!probe) return [];
-  const res = await send(target(cfg, provider, probe), timeoutMs, authHeaders(cfg.apiKey));
+  const res = await send(target(cfg, provider, probe), timeoutMs, probeHeaders(cfg, provider));
   if (res.timedOut || res.error !== null || res.status < 200 || res.status >= 300) return [];
   try { return probe.models(JSON.parse(res.text)); } catch { return []; }
 }

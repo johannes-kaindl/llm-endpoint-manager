@@ -11,7 +11,7 @@ import { authHeaders, type EndpointRole } from "../vendor/kit/endpoint_config";
 import { normalizeEndpoint } from "../vendor/kit/endpoint";
 import { BACKEND_IDS, BACKENDS, FAMILIES, FAMILY_IDS, MODEL_FAMILIES, type BackendId, type FamilyId } from "../vendor/kit/sampling-profiles";
 import { probeBaseUrl, probeEndpoint } from "../vendor/kit/capabilities";
-import { CAPABILITIES, PROVIDERS, DEFAULT_SHORTCUT_NAME, DEFAULT_SHORTCUT_TIMEOUT_MS, labelFromUrl, newId, type ManagedEndpoint, type Provider } from "../core/model";
+import { CAPABILITIES, PROVIDERS, DEFAULT_SHORTCUT_NAME, DEFAULT_SHORTCUT_TIMEOUT_MS, labelFromUrl, newId, withProvider, type ManagedEndpoint, type Provider } from "../core/model";
 import { modelRows, setModelMeta, type ModelRow } from "../core/model-rows";
 import { PRESETS } from "../core/provider";
 import { firstActiveUrl } from "../core/reachability";
@@ -23,6 +23,12 @@ type GroupDef = { type?: string; heading?: string; items?: ItemDef[] };
 
 /** Anzeigename eines Presets in der gewählten Sprache: der Kit-Editor reicht nur `{label, url}` durch, die
  *  Übersetzung hängt deshalb am kanonischen `label` (Marken ohne `labelKey` bleiben stehen). */
+/** Tooltip der Vorlage: „X hinzufügen“, bei Vorlagen mit Zusammenhang (Claude) mit dem einen Satz dahinter. */
+export function presetTooltip(p: { label: string }): string {
+  const hint = PRESETS.find((x) => x.label === p.label)?.hintKey;
+  return hint ? `${t("ep.preset", presetText(p))} ${t(hint)}` : t("ep.preset", presetText(p));
+}
+
 export function presetText(p: { label: string }): string {
   const key = PRESETS.find((x) => x.label === p.label)?.labelKey;
   return key ? t(key) : p.label;
@@ -113,7 +119,7 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
         : role.kind === "standby" ? t("ep.role.standby", String(role.position))
         : role.kind === "unreachable" ? t("ep.role.unreachable") : t("ep.role.skippedModel"),
       warnings: (ws) => ws.map((w) => endpointWarningText(w.rule, { lang: getLang(), fallback: w.message })).join(" · "),
-      presetTooltip: (p) => t("ep.preset", presetText(p)), presetLabel: (p) => presetText(p),
+      presetTooltip: (p) => presetTooltip(p), presetLabel: (p) => presetText(p),
       emptyModel: t("ep.emptyModel"),
       contextText: (c) => c.loadedContextLength !== undefined && c.maxContextLength !== undefined
         ? t("ep.context.loaded", c.loadedContextLength.toLocaleString(getLang()), c.maxContextLength.toLocaleString(getLang()))
@@ -151,6 +157,7 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
       const out: ManagedEndpoint = { ...e, id: newId(), label: e.label || (preset?.transport && presetText(preset)) || labelFromUrl(e.url) || (preset && presetText(preset)) || t("row.newEndpoint"), provider: preset?.provider ?? "openai",
         capabilities: preset ? [...preset.capabilities] : ["chat"], enabled: true };
       if (preset?.transport) out.transport = preset.transport;
+      if (preset?.backend) out.backend = preset.backend;
       if (preset?.shortcut) out.shortcut = { ...preset.shortcut };
       if (preset?.models) out.models = preset.models.map((m) => ({ ...m }));
       return out;
@@ -210,8 +217,9 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
   private renderEndpoints(setting: Setting): void {
     this.rowReach.clear(); this.rowProbes.clear();
     this.watchChanges();
+    const listHost = settingBodyHost(setting);
     buildEndpointList<ManagedEndpoint>({
-      containerEl: settingBodyHost(setting),
+      containerEl: listHost,
       label: t("set.endpoints"), desc: t("set.endpointsDesc"), placeholder: "http://localhost:1234",
       strings: this.endpointStrings(), cache: this.modelLists,
       get: () => this.plugin.settings.endpoints,
@@ -237,6 +245,10 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
       },
       extraRow: (host, cfg) => { this.renderExtra(host, cfg); },
     });
+    // Die Knopfreihe der Vorlagen („LM Studio“ … „Check connections“) ist die LETZTE Zeile, die der Kit-Editor anlegt, und trägt keine
+    // eigene Klasse; mit der Claude-Vorlage reicht das schmale Fenster nicht mehr für eine Reihe (der letzte Knopf war abgeschnitten).
+    // Die Klasse erlaubt den Umbruch in styles.css.
+    (listHost.lastElementChild as HTMLElement | null)?.classList.add("lem-presets");
   }
 
   private renderExtra(host: HTMLElement, cfg: ManagedEndpoint): void {
@@ -260,7 +272,7 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
       // ist nach Schlüssel indiziert, muss also hier gezielt invalidiert werden. `save()` invalidiert
       // nur `handle.invalidateUrl` (API-interne Caches, s. Kommentar dort); dieser Cache ist lokal
       // im Settings-Tab und lebt in `this.modelLists`, nicht im Handle.
-      d.onChange((v) => { this.modelLists.invalidate(normalizeEndpoint(cfg.url)); void save((e) => { e.provider = v as Provider; }).then(() => this.refreshUi()); });
+      d.onChange((v) => { this.modelLists.invalidate(normalizeEndpoint(cfg.url)); void save((e) => { withProvider(e, v as Provider); }).then(() => this.refreshUi()); });
     });
     const caps = new Setting(host).setName(t("row.capabilities"));
     // Eigene Klasse statt `:has(.lem-cap)` in styles.css (Store-Befund „Avoid :has“, 0.2.3).
@@ -286,6 +298,7 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
       tg.onChange((on) => { void save((e) => { e.enabled = on; }); });
     });
     if (cfg.provider === "apple-shortcuts") this.renderAppleShortcut(host, cfg, save);
+    if (cfg.provider === "anthropic") host.createDiv({ cls: "lem-row-note", text: t("ep.anthropicDesc") });
     const warn = host.createDiv({ cls: "lem-row-warn" });
     warn.setAttribute("data-for", cfg.id);
     this.syncCapWarning(host, cfg.id);

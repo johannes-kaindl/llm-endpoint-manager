@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.61.0, src/pure/endpoint-source.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.62.0, src/pure/endpoint-source.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 import { hydrateEndpointSecrets, resolveActiveEndpointConfig, type EndpointConfig } from "./endpoint_config";
 import type { SecretStore } from "./secrets";
 import { familyFromName, type BackendId, type FamilyId, type ModelFamilyId } from "./sampling-profiles";
@@ -9,7 +9,7 @@ import { familyFromName, type BackendId, type FamilyId, type ModelFamilyId } fro
 export const LLM_ENDPOINT_MANAGER_API_VERSION = 1;
 export const LLM_ENDPOINT_MANAGER_PLUGIN_ID = "llm-endpoint-manager";
 
-export type Provider = "openai" | "ollama" | "a1111" | "comfy" | "apple-shortcuts";
+export type Provider = "openai" | "ollama" | "a1111" | "comfy" | "apple-shortcuts" | "anthropic";
 export type Capability = "chat" | "embedding" | "vision" | "image";
 export type ApiErrorCode = "no-endpoint" | "not-found" | "disabled" | "secret-missing" | "unreachable";
 export interface ApiError { error: ApiErrorCode }
@@ -21,7 +21,7 @@ export interface ApiModelInfo { id: string; family?: FamilyId; displayFamily?: M
  *  `shortcut` ist nur bei `transport: "shortcuts"` gesetzt (Kurzbefehl-Name + Timeout, kommen aus
  *  `ResolvedEndpoint` in den Konsumenten-Transport, s. `obsidian/chat-transport.ts`
  *  `createShortcutsChatTransport`). */
-export type EndpointTransport = "http" | "shortcuts";
+export type EndpointTransport = "http" | "shortcuts" | "anthropic";
 export interface ShortcutTransportConfig { name: string; timeoutMs: number }
 export interface ApiEndpoint {
   id: string; label: string; url: string; provider: Provider; capabilities: Capability[];
@@ -42,7 +42,7 @@ export interface LlmEndpointManagerApi {
   version: 1;
   list(filter?: ListFilter): ApiEndpoint[];
   get(id: string): ApiEndpoint | null;
-  resolve(capability: Capability, opts?: { caller?: string }): Promise<ResolvedEndpoint | ApiError>;
+  resolve(capability: Capability, opts?: { caller?: string; transports?: EndpointTransport[] }): Promise<ResolvedEndpoint | ApiError>;
   materialize(id: string, opts?: { caller?: string }): Promise<ResolvedEndpoint | ApiError>;
   models(id: string, opts?: { force?: boolean }): Promise<string[] | ApiError>;
   importEndpoints(eps: EndpointConfig[], capability: Capability): Promise<ImportResult | ApiError>;
@@ -97,6 +97,9 @@ export interface EndpointSourceInput {
   capability: Capability;
   choice?: EndpointChoice;
   caller?: string;
+  /** Opt-in für `resolve()` wie `list()`: ohne Angabe nur `"http"` (ein älterer Manager ignoriert das Feld). Wer `"anthropic"`
+   *  oder `"shortcuts"` anfordert, muss den passenden Transport bereitstellen (`llm-connection` `transports`). */
+  transports?: EndpointTransport[];
   backendOf?: (cfg: EndpointConfig) => Promise<BackendId | null>;
 }
 export interface EndpointSourceResult {
@@ -189,7 +192,7 @@ export async function resolveEndpointSource(
     const config = await resolveActiveEndpointConfig(input.secrets && input.secretPrefix ? hydrateEndpointSecrets(input.local, input.secrets, input.secretPrefix) : input.local, ping);
     return finish({ kind: "local", config, model: config ? localModelOf(input.choice, config) : "" }, input, null);
   }
-  const opts = input.caller ? { caller: input.caller } : undefined;
+  const opts = input.caller || input.transports ? { ...(input.caller ? { caller: input.caller } : {}), ...(input.transports ? { transports: input.transports } : {}) } : undefined;
   try {
     let reason: ApiErrorCode | undefined;
     const wanted = input.choice?.endpointId;

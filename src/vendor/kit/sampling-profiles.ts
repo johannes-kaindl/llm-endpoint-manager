@@ -1,4 +1,4 @@
-// vendored from code-kit@0.28.0, src/ts/pure/sampling-profiles.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from code-kit@0.28.1, src/ts/pure/sampling-profiles.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 /** Request profiles for local and hosted LLM backends: which sampling values, which
  *  reasoning_effort and which minimum token budget a plugin sends, per model family × mode,
  *  and which of those fields a backend actually honours.
@@ -580,8 +580,27 @@ export function onLevelFor(s: RequestSettings, mode: ModeId): ThinkingLevel {
   return MODES[mode].thinking !== "off" ? MODES[mode].thinking : "low";
 }
 
-export type DeviationKind = "thinking-despite-off" | "empty-by-budget" | "family-mismatch" | "family-detected" | "rejected";
+/** What the settings UI can be told went differently from what the profile asked for.
+ *  - `thinking-despite-off`: the answer holds a thought although thinking was off (and the family can be turned off).
+ *  - `empty-by-budget`: no text, the thinking ate the token budget (`finish_reason` `length`).
+ *  - `family-mismatch` / `family-detected`: the answering model is not the configured family / names a family nobody configured.
+ *  - `rejected`: HTTP 400, `detail` is the server's text.
+ *  - `override-dropped` (0.28.1): the transport left out a per-call fixed value because the backend refuses it (transmute's
+ *    `temperature: 0` on Claude); `affectsResult: false`, `detail` = the dropped field names ({@link overrideDroppedDeviation}).
+ *    Only a request knows this: {@link checkResponse} never returns it, the transport reports it. */
+export const DEVIATION_KINDS = ["thinking-despite-off", "empty-by-budget", "family-mismatch", "family-detected", "rejected", "override-dropped"] as const;
+export type DeviationKind = (typeof DEVIATION_KINDS)[number];
 export interface Deviation { kind: DeviationKind; affectsResult: boolean; detail?: string }
+
+/** The `override-dropped` deviation for the fields a transport left out of a request, or `null` if it left out none. `detail` lists
+ *  each name once, the profile's fields in {@link FIELD_ORDER}, any other name after them in the order given. */
+export function overrideDroppedDeviation(fields: readonly string[]): Deviation | null {
+  const given = new Set(fields);
+  const known = FIELD_ORDER.filter((f) => given.has(f));
+  const other = [...given].filter((f) => !(FIELD_ORDER as readonly string[]).includes(f));
+  const names = [...known, ...other];
+  return names.length === 0 ? null : { kind: "override-dropped", affectsResult: false, detail: names.join(", ") };
+}
 export interface ResponseFacts {
   status: number;
   errorText?: string;

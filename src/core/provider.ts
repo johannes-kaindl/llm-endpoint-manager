@@ -1,7 +1,8 @@
 import { extractModelIds } from "../vendor/kit/endpoint_diagnostics";
 import type { ApiModelInfo } from "../vendor/kit/endpoint-source";
-import type { Capability, Provider, ShortcutTransportConfig } from "./model";
-import { APPLE_SHORTCUTS_URL, DEFAULT_SHORTCUT_NAME, DEFAULT_SHORTCUT_TIMEOUT_MS } from "./model";
+import type { BackendId } from "../vendor/kit/sampling-profiles";
+import type { Capability, EndpointTransport, Provider, ShortcutTransportConfig } from "./model";
+import { ANTHROPIC_URL, APPLE_SHORTCUTS_URL, DEFAULT_SHORTCUT_NAME, DEFAULT_SHORTCUT_TIMEOUT_MS } from "./model";
 
 export interface ProviderProbe {
   /** Pfad relativ zur normalisierten Basis-URL (ohne /v1), der Erreichbarkeit UND Modell-Liste liefert. */
@@ -27,6 +28,10 @@ export function providerProbe(p: Provider): ProviderProbe | null {
       };
     case "comfy":
       return { path: "/system_stats", models: () => [] };
+    case "anthropic":
+      // Wie openai/ollama `{data:[{id,…}]}`; ohne `limit` liefert die API nur die ersten 20 Modelle. Die Kopfzeilen
+      // (x-api-key, anthropic-version) setzt http.ts.
+      return { path: "/v1/models?limit=1000", models: (body) => extractModelIds(body).sort() };
     case "apple-shortcuts":
       return null;
   }
@@ -41,8 +46,12 @@ export interface ProviderPreset {
   url: string;
   provider: Provider;
   capabilities: Capability[];
-  transport?: "shortcuts";
+  transport?: Exclude<EndpointTransport, "http">;
   shortcut?: ShortcutTransportConfig;
+  /** Das Backend, das der Eintrag trägt (Anthropic: der Manager sagt es, die Plugins brauchen es für das Sampling-Profil). */
+  backend?: BackendId;
+  /** Ein Satz, der im Tooltip der Vorlage steht, wo ein Plugin-Zusammenhang erklärt werden muss (Claude: welche Plugins schon können). */
+  hintKey?: string;
 }
 
 export const PRESETS: readonly ProviderPreset[] = [
@@ -53,5 +62,9 @@ export const PRESETS: readonly ProviderPreset[] = [
     label: "Apple Intelligence (on-device)", labelKey: "preset.apple", url: APPLE_SHORTCUTS_URL, provider: "apple-shortcuts", capabilities: ["chat"],
     models: [{ id: "apple-fm", displayFamily: "apple-fm" }],
     transport: "shortcuts", shortcut: { name: DEFAULT_SHORTCUT_NAME, timeoutMs: DEFAULT_SHORTCUT_TIMEOUT_MS },
+  },
+  {
+    label: "Anthropic (Claude API)", labelKey: "preset.anthropic", hintKey: "preset.anthropic.hint", url: ANTHROPIC_URL, provider: "anthropic", capabilities: ["chat", "vision"],
+    transport: "anthropic", backend: "anthropic",
   },
 ];

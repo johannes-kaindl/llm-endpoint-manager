@@ -75,7 +75,7 @@ export function createManagerApi(deps: ApiDeps): ManagerApiHandle {
     get(id) { const e = find(id); return e ? toApiEndpoint(e, deps.secrets) : null; },
     async resolve(capability, opts) {
       record(opts?.caller, capability);
-      const r = await resolveFirst(deps.settings().endpoints, capability, reachability, safeProbe, token);
+      const r = await resolveFirst(deps.settings().endpoints, capability, reachability, safeProbe, token, opts?.transports);
       return "error" in r ? r : toResolved(r);
     },
     async materialize(id, opts) {

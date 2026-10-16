@@ -173,6 +173,37 @@ describe("list() transports-Opt-in (apple-shortcuts, Spec § Baustein 2)", () =>
   });
 });
 
+describe("Claude-Endpunkt hinter dem Opt-in (Welle 23)", () => {
+  const withClaude = () => loadSettings({ endpoints: [
+    { id: "c", label: "Claude API", url: "https://api.anthropic.com", provider: "anthropic", capabilities: ["chat", "vision"], secretId: "llm-endpoint-manager-c", model: "claude-haiku-5-5" },
+    { id: "a", label: "A", url: "http://a", capabilities: ["chat"] },
+  ] });
+  it("list() ohne transports zeigt ihn nie (ältere Plugins erreichen weder backend noch family), mit Opt-in samt provider, transport und backend", () => {
+    const { d } = deps(withClaude());
+    const { api } = createManagerApi(d);
+    expect(api.list().map((e) => e.id)).toEqual(["a"]);
+    expect(api.list({ capability: "chat" }).map((e) => e.id)).toEqual(["a"]);
+    const r = api.list({ transports: ["http", "anthropic"] });
+    expect(r.map((e) => e.id)).toEqual(["c", "a"]);
+    expect(r[0]).toMatchObject({ provider: "anthropic", transport: "anthropic", backend: "anthropic", defaultModel: "claude-haiku-5-5" });
+  });
+  it("resolve() ohne Opt-in nimmt den lokalen, mit transports den Claude-Endpunkt; materialize(id) geht immer", async () => {
+    const { d, secrets } = deps(withClaude());
+    secrets.set("llm-endpoint-manager-c", "sk-ant-x");
+    const { api } = createManagerApi(d);
+    expect((await api.resolve("chat") as { id: string }).id).toBe("a");
+    const r = await api.resolve("chat", { transports: ["http", "anthropic"] }) as { id: string; transport?: string; backend?: string; config: { apiKey?: string } };
+    expect([r.id, r.transport, r.backend, r.config.apiKey]).toEqual(["c", "anthropic", "anthropic", "sk-ant-x"]);
+    expect((await api.materialize("c") as { id: string }).id).toBe("c");
+  });
+  it("ein Fremdplugin ohne Opt-in bekommt auch ohne Token keine Spur: resolve überspringt ihn still (no-endpoint, wenn nichts bleibt)", async () => {
+    const s = loadSettings({ endpoints: [{ id: "c", label: "Claude", url: "https://api.anthropic.com", provider: "anthropic", capabilities: ["chat"] }] });
+    const { d } = deps(s);
+    const { api } = createManagerApi(d);
+    expect(await api.resolve("chat")).toEqual({ error: "no-endpoint" });
+  });
+});
+
 describe("api-types Re-Export", () => {
   it("LLM_ENDPOINT_MANAGER_API_VERSION kommt aus dem gevendorten Kit-Modul — eine Quelle", () => {
     expect(LLM_ENDPOINT_MANAGER_API_VERSION).toBe(1);

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { createReachabilityCache, firstActiveUrl, materialize, resolveFirst } from "../src/core/reachability";
+import { autoResolvable, createReachabilityCache, firstActiveUrl, materialize, resolveFirst } from "../src/core/reachability";
 import type { ManagedEndpoint } from "../src/core/model";
 
 const ep = (o: Partial<ManagedEndpoint> & { url: string }): ManagedEndpoint => ({
@@ -90,5 +90,33 @@ describe("firstActiveUrl", () => {
   it("liefert null, solange kein Eintrag als erreichbar bekannt ist", () => {
     expect(firstActiveUrl([ep({ url: "http://a" })], "chat", () => undefined, tok)).toBeNull();
     expect(firstActiveUrl([ep({ url: "http://a" })], "chat", () => false, tok)).toBeNull();
+  });
+});
+
+describe("resolve() und transports (Welle 23: anthropic hinter dem Opt-in)", () => {
+  const claude = ep({ url: "https://api.anthropic.com", provider: "anthropic", transport: "anthropic", secretId: "ok" });
+  const local = ep({ url: "http://ok" });
+  const tok = (sid: string): string | null => (sid === "ok" ? "t" : null);
+  it("autoResolvable: ohne Opt-in nur http; anthropic nur mit Opt-in; Kurzbefehle nie", () => {
+    expect(autoResolvable(local)).toBe(true);
+    expect(autoResolvable(claude)).toBe(false);
+    expect(autoResolvable(claude, ["http", "anthropic"])).toBe(true);
+    expect(autoResolvable(local, ["anthropic"])).toBe(false);
+    const apple = ep({ url: "apple-shortcuts://x", transport: "shortcuts" });
+    expect(autoResolvable(apple, ["http", "shortcuts", "anthropic"])).toBe(false);
+  });
+  it("resolveFirst ohne Opt-in überspringt den Claude-Endpunkt, auch wenn er zuerst steht", async () => {
+    const probe = vi.fn((m: { config: { url: string } }) => Promise.resolve(true));
+    const r = await resolveFirst([claude, local], "chat", createReachabilityCache(() => 0), probe, tok);
+    expect((r as { ep: ManagedEndpoint }).ep.url).toBe("http://ok");
+    expect(probe.mock.calls.map((c) => c[0].config.url)).toEqual(["http://ok"]);
+  });
+  it("resolveFirst mit Opt-in nimmt ihn in Listenreihenfolge", async () => {
+    const r = await resolveFirst([claude, local], "chat", createReachabilityCache(() => 0), () => Promise.resolve(true), tok, ["http", "anthropic"]);
+    expect((r as { ep: ManagedEndpoint }).ep.provider).toBe("anthropic");
+  });
+  it("firstActiveUrl folgt derselben Regel (die Zeile „aktiv“ zeigt, was resolve wählt)", () => {
+    expect(firstActiveUrl([claude, local], "chat", () => true, tok)).toBe("http://ok");
+    expect(firstActiveUrl([claude, local], "chat", () => true, tok, ["http", "anthropic"])).toBe("https://api.anthropic.com");
   });
 });

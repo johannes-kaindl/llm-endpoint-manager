@@ -1,8 +1,8 @@
 {
-  "sources": { "obsidian-kit": { "ref": "0.61.0" }, "code-kit": { "ref": "0.28.0" } },
+  "sources": { "obsidian-kit": { "ref": "0.62.0" }, "code-kit": { "ref": "0.28.1" } },
   "targets": [
     {
-      "dir": "src/vendor/kit", "source": "obsidian-kit", "from": "src/pure", "modules": ["endpoint-source", "endpoint-secret-hook"],
+      "dir": "src/vendor/kit", "source": "obsidian-kit", "from": "src/pure", "modules": ["endpoint-source", "endpoint-secret-hook", "anthropic-wire"],
       "rewrite": [["../vendor/code-kit/pure/", "./"], ["../vendor/code-kit/web/", "./"]]
     },
     {

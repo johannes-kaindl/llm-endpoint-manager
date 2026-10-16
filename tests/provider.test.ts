@@ -16,6 +16,15 @@ describe("providerProbe", () => {
     expect(providerProbe("comfy")?.path).toBe("/system_stats");
     expect(providerProbe("comfy")?.models({ system: {} })).toEqual([]);
   });
+  it("anthropic liest /v1/models (mit limit, sonst nur 20 Modelle) und data[].id", () => {
+    const pp = providerProbe("anthropic");
+    expect(pp?.path).toBe("/v1/models?limit=1000");
+    expect(pp?.models({ data: [{ id: "claude-b" }, { id: "claude-a" }] })).toEqual(["claude-a", "claude-b"]);
+  });
+  it("Anthropic-Preset: fester Host, Transport und Backend anthropic, Hinweis-Schlüssel", () => {
+    const preset = PRESETS.find((p) => p.provider === "anthropic");
+    expect(preset).toMatchObject({ url: "https://api.anthropic.com", transport: "anthropic", backend: "anthropic", hintKey: "preset.anthropic.hint" });
+  });
   it("apple-shortcuts hat KEINEN HTTP-Pfad", () => {
     expect(providerProbe("apple-shortcuts")).toBeNull();
   });
@@ -25,6 +34,7 @@ describe("providerProbe", () => {
       ["Ollama", "ollama", ["chat", "embedding"]],
       ["OpenAI-compatible cloud", "openai", ["chat"]],
       ["Apple Intelligence (on-device)", "apple-shortcuts", ["chat"]],
+      ["Anthropic (Claude API)", "anthropic", ["chat", "vision"]],
     ]);
   });
   it("Presets mit eigener Bezeichnung tragen einen i18n-Schluessel (Marken wie LM Studio und Ollama nicht)", () => {
@@ -33,6 +43,7 @@ describe("providerProbe", () => {
       ["Ollama", undefined],
       ["OpenAI-compatible cloud", "preset.cloud"],
       ["Apple Intelligence (on-device)", "preset.apple"],
+      ["Anthropic (Claude API)", "preset.anthropic"],
     ]);
   });
   it("Apple-Preset traegt die eine Modellzeile mit Anzeige-Familie apple-fm (ohne Sampling-Familie)", () => {

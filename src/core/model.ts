@@ -10,7 +10,7 @@ export type { Provider, Capability, EndpointTransport, ShortcutTransportConfig }
  *  `Provider`/`Capability`-Union der Kit-Quelle, bricht der Compiler HIER statt still einen
  *  unbekannten Wert in `normalizeEndpointEntry` auf "openai" herunterzustufen bzw. im
  *  Settings-Dropdown wegzulassen (Finding 3, Whole-Branch-Review). */
-export const PROVIDERS = ["openai", "ollama", "a1111", "comfy", "apple-shortcuts"] as const satisfies readonly Provider[];
+export const PROVIDERS = ["openai", "ollama", "a1111", "comfy", "apple-shortcuts", "anthropic"] as const satisfies readonly Provider[];
 export type _AlleProviderAbgedeckt = Exclude<Provider, (typeof PROVIDERS)[number]> extends never ? true : never;
 
 export const CAPABILITIES = ["chat", "embedding", "vision", "image"] as const satisfies readonly Capability[];
@@ -43,6 +43,7 @@ export interface ManagedEndpoint extends EndpointConfig {
  *  dass irgendein Code ihn je als URL anfragt (`providerProbe("apple-shortcuts")` liefert `null`,
  *  s. provider.ts). */
 export const APPLE_SHORTCUTS_URL = "apple-shortcuts://on-device";
+export const ANTHROPIC_URL = "https://api.anthropic.com";
 export const DEFAULT_SHORTCUT_NAME = "Ask On-Device Model (Obsidian)";
 /** Spike-Messung: 8–14 s Rundlauf bei > 8k Zeichen Payload (Spec § Kontext und Messgrundlage).
  *  30 s Marge für Guardrail-Prüfung und langsamere Geräte. */
@@ -105,7 +106,22 @@ function modelsOf(raw: unknown): ApiModelInfo[] | undefined {
 }
 
 function transportOf(raw: unknown): EndpointTransport | undefined {
-  return raw === "http" || raw === "shortcuts" ? raw : undefined;
+  return raw === "http" || raw === "shortcuts" || raw === "anthropic" ? raw : undefined;
+}
+
+/** Der Anbieter `anthropic` spricht die native Messages-API: Transport und Backend folgen ihm, sonst gäbe die API einen
+ *  Eintrag heraus, den ein älteres Plugin als `http` liest (Welle 23: der Transport ist der Opt-in, hinter dem der Endpunkt
+ *  für ältere Plugins unsichtbar bleibt). Beim Wechsel zu einem anderen Anbieter fallen beide wieder weg, aber nur, wo sie
+ *  von `anthropic` stammen. */
+export function withProvider(e: ManagedEndpoint, provider: Provider): void {
+  e.provider = provider;
+  if (provider === "anthropic") {
+    e.transport = "anthropic";
+    e.backend = "anthropic";
+    return;
+  }
+  if (e.transport === "anthropic") delete e.transport;
+  if (e.backend === "anthropic") delete e.backend;
 }
 
 function shortcutOf(raw: unknown): ShortcutTransportConfig | undefined {
@@ -156,6 +172,7 @@ export function normalizeEndpointEntry(raw: unknown, mint: () => string): Manage
   if (models && models.length) out.models = models;
   const transport = transportOf(r.transport);
   if (transport) out.transport = transport;
+  if (provider === "anthropic") { out.transport = "anthropic"; out.backend ??= "anthropic"; }
   const shortcut = shortcutOf(r.shortcut);
   if (shortcut) out.shortcut = shortcut;
   return out;

@@ -3,7 +3,7 @@ import { requestUrl } from "obsidian";
 import { makeFakeApp, Modal, Setting, TextComponent, ToggleComponent, DropdownComponent, ButtonComponent, ExtraButtonComponent } from "./vendor/kit/obsidian-mock";
 import LlmEndpointManagerPlugin from "../src/main";
 import { helpSettingDefinition } from "../src/vendor/kit-obsidian/help-setting";
-import { LlmEndpointManagerSettingTab, helpOptions, presetText } from "../src/obsidian/settings-tab";
+import { LlmEndpointManagerSettingTab, helpOptions, presetText, presetTooltip } from "../src/obsidian/settings-tab";
 import { setLang } from "../src/vendor/kit/i18n";
 import { ENDPOINT_STATUS_TEXTS_DE, ENDPOINT_STATUS_TEXTS_EN } from "../src/vendor/kit-obsidian/endpoint-status-text";
 
@@ -246,6 +246,33 @@ describe("LlmEndpointManagerSettingTab", () => {
     const { tab: t } = await tab({});
     const complete = (t as unknown as { complete: (e: { url: string }[]) => { models?: unknown[] }[] }).complete.bind(t);
     expect(complete([{ url: "apple-shortcuts://on-device" }])[0]?.models).toEqual([{ id: "apple-fm", displayFamily: "apple-fm" }]);
+  });
+  it("uebernimmt Provider, Transport, Backend und Fähigkeiten aus dem Anthropic-Preset beim Vervollstaendigen", async () => {
+    const { tab: t } = await tab({});
+    const complete = (t as unknown as { complete: (e: { url: string }[]) => Array<{ label: string; provider: string; transport?: string; backend?: string; capabilities: string[] }> }).complete.bind(t);
+    const [e] = complete([{ url: "https://api.anthropic.com" }]);
+    expect([e?.provider, e?.transport, e?.backend, e?.capabilities, e?.label]).toEqual(["anthropic", "anthropic", "anthropic", ["chat", "vision"], "Anthropic (Claude API)"]);
+  });
+  it("Tooltip der Anthropic-Vorlage trägt den einen Satz zu den Plugins (EN/DE); andere Vorlagen bleiben bei „hinzufügen“", async () => {
+    await tab({});
+    setLang("en");
+    expect(presetTooltip({ label: "Anthropic (Claude API)" })).toBe("Add Anthropic (Claude API) Claude with your own Anthropic key. Koda can use it already; the other plugins follow with their next update.");
+    expect(presetTooltip({ label: "LM Studio" })).toBe("Add LM Studio");
+    setLang("de");
+    try { expect(presetTooltip({ label: "Anthropic (Claude API)" })).toContain("Koda kann sie schon nutzen"); }
+    finally { setLang("en"); }
+  });
+  it("eine Claude-Zeile zeigt den Hinweis zum Schlüssel; die Protokoll-Auswahl kennt Anthropic, ein Wechsel zurück nimmt Transport und Backend weg", async () => {
+    const { el, plugin } = await tab({ endpoints: [{ id: "c", label: "Claude API", url: "https://api.anthropic.com", provider: "anthropic", capabilities: ["chat", "vision"] }] });
+    expect(el.textContent).toContain("Put your Anthropic API key into the token field");
+    const providerRow = settingsIn(el).find((s) => s.nameValue === "Protocol")!;
+    const dd = providerRow.components.find((c): c is DropdownComponent => c instanceof DropdownComponent)!;
+    expect(dd.getValue()).toBe("anthropic");
+    expect(Object.keys(dd.options)).toContain("anthropic");
+    dd.onChangeCB?.("openai");
+    await new Promise((r) => setTimeout(r, 0));
+    const stored = plugin.settings.endpoints[0]!;
+    expect([stored.provider, stored.transport, stored.backend]).toEqual(["openai", undefined, undefined]);
   });
   it("zeichnet den Apple-Modellblock aus den Kit-Daten (Familien-Bezeichnung) und haengt den Grenzen-Text an", async () => {
     const { el } = await tab({ endpoints: [
