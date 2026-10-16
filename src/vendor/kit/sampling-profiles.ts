@@ -1,4 +1,4 @@
-// vendored from code-kit@0.27.1, src/ts/pure/sampling-profiles.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from code-kit@0.28.0, src/ts/pure/sampling-profiles.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 /** Request profiles for local and hosted LLM backends: which sampling values, which
  *  reasoning_effort and which minimum token budget a plugin sends, per model family × mode,
  *  and which of those fields a backend actually honours.
@@ -16,7 +16,7 @@
 import { reasoningHappened } from "./reasoning";
 import { stripThinkBlocks } from "./think-splitter";
 
-export const FAMILY_IDS = ["qwen3.8", "qwen3.6", "gemma4", "gpt-oss"] as const;
+export const FAMILY_IDS = ["qwen3.8", "qwen3.6", "gemma4", "gpt-oss", "claude"] as const;
 export type FamilyId = (typeof FAMILY_IDS)[number];
 /** Override key: a known family, or "unknown" for models the kit cannot place. */
 export type FamilyKey = FamilyId | "unknown";
@@ -24,7 +24,7 @@ export type FamilyKey = FamilyId | "unknown";
 export const MODE_IDS = ["agent", "structured", "transform", "grounded", "companion", "creative", "complete"] as const;
 export type ModeId = (typeof MODE_IDS)[number];
 
-export const BACKEND_IDS = ["lmstudio", "openwebui", "ollama", "openai", "unknown"] as const;
+export const BACKEND_IDS = ["lmstudio", "openwebui", "ollama", "openai", "anthropic", "unknown"] as const;
 export type BackendId = (typeof BACKEND_IDS)[number];
 
 export const THINKING_LEVELS = ["off", "low", "medium", "high"] as const;
@@ -58,19 +58,48 @@ export interface FamilyProfile {
   thinkingTemperatureFloor?: Sourced<number>;
   /** Minimum max_tokens per level so thinking cannot eat the whole budget. */
   reserve: Record<ThinkingLevel, Sourced<number>>;
+  /** Where one backend changes what the family does with the thinking level — measured per cell (family × backend),
+   *  never guessed for the others. Read through {@link familyThinking}, not directly. */
+  byBackend?: Partial<Record<BackendId, BackendThinking>>;
+  /** Fields the family's API refuses on EVERY backend (a 400, not a no-op), so no mode, override or backend table can
+   *  make them go out. The value is the reason; the source says where it was read. */
+  unsupportedFields?: Partial<Record<FieldId, Sourced<string>>>;
+}
+
+/** What a backend changes for one family. A level or the whole `canTurnOff` that is not named stays the family's. */
+export interface BackendThinking {
+  canTurnOff?: boolean;
+  effort?: Partial<Record<ThinkingLevel, Sourced<string>>>;
+  reserve?: Partial<Record<ThinkingLevel, Sourced<number>>>;
 }
 
 export interface ModeProfile { temperature: Sourced<number>; thinking: ThinkingLevel }
-export interface BackendProfile { label: string; fields: Record<FieldId, FieldSupport>; source: string }
+export interface BackendProfile {
+  label: string;
+  fields: Record<FieldId, FieldSupport>;
+  source: string;
+  /** Name of the request key `reasoning_effort` is sent under when the backend calls it something else
+   *  (`effort` on Anthropic). The explain row keeps the field name `reasoning_effort`. A FLAT key: the native Messages API
+   *  wants it nested as `output_config.effort`, which the transport builds. */
+  effortParam?: string;
+  /** The effort values the backend takes. A value outside the list (`none` from a qwen mapping or an override) is not sent. */
+  effortValues?: readonly string[];
+}
 
 const m = (value: number, source: string): Sourced<number> => ({ value, source, evidence: "measured" });
 const u = (value: number, source: string): Sourced<number> => ({ value, source, evidence: "unmeasured" });
 const ms = (value: string, source: string): Sourced<string> => ({ value, source, evidence: "measured" });
 const us = (value: string, source: string): Sourced<string> => ({ value, source, evidence: "unmeasured" });
 
+const CLAUDE_SAMPLING = "Anthropic docs (claude-api skill 2026-10-06; OpenAI compatibility page 2026-10-16): temperature, top_p, top_k removed on Claude Fable 5/5.1, Opus 5.5/5/4.8/4.7, non-default values refused on Sonnet 5.5 and Haiku 5.5; compatibility layer: temperature below 1 and top_p other than 0.99 return 400 on Claude 4.7 and newer";
+const CLAUDE_EFFORT = "Anthropic docs (claude-api skill 2026-10-06): output_config.effort low/medium/high/xhigh/max; not called by us";
+const CLAUDE_OFF = "Anthropic docs (claude-api skill 2026-10-06): thinking {type: disabled} returns 400 on Opus 5.5 and Sonnet 5.5, thinking is always on on Fable 5/5.1, so off is the lowest effort";
+const CLAUDE_RESERVE = "Anthropic docs (claude-api skill 2026-10-06): max_tokens includes the adaptive thinking, default ~16000; conservative, unmeasured";
+const cn = (value: string, source: string): Sourced<string> => ({ value, source, evidence: "unmeasured" });
 const QWEN38_CARD = "model card Qwen/Qwen3.8-27B (retrieved 2026-09-20)";
 const QWEN_GREEDY = "Qwen docs quickstart (Qwen3): no greedy decoding while thinking; transferred, supported by harness night run 2026-09-19";
 const HARNESS = "llm-benchmark-harness night run 2026-09-19, max reasoning tokens per level, rounded up";
+const GEMMA_LMS = "kitcc-w22 2026-10-14, google/gemma-4-e4b on LM Studio (one model size): none ignored, thought in content; low/minimal/medium/high/no field think into reasoning_content";
 const LMS_EFFORT = "llm-setup 2026-09-18, reasoning tokens none 0 / low 226 / medium 251 / xhigh 930";
 
 export const FAMILIES: Record<FamilyId, FamilyProfile> = {
@@ -111,6 +140,13 @@ export const FAMILIES: Record<FamilyId, FamilyProfile> = {
     },
     canTurnOff: true,
     reserve: { off: u(0, "no thinking"), low: u(1024, "unmeasured, conservative"), medium: u(2048, "unmeasured, conservative"), high: u(8192, "unmeasured, conservative") },
+    byBackend: {
+      lmstudio: {
+        canTurnOff: false,
+        effort: { off: ms("low", GEMMA_LMS) },
+        reserve: { off: u(1024, "thinks at the level of low when off (" + GEMMA_LMS + "); reserve of low") },
+      },
+    },
   },
   "gpt-oss": {
     label: "gpt-oss",
@@ -125,6 +161,26 @@ export const FAMILIES: Record<FamilyId, FamilyProfile> = {
     reserve: {
       off: m(256, "llm-configs: max_tokens 40 left content empty, 60 answered; 256 as margin"),
       low: u(1024, "unmeasured"), medium: u(2048, "unmeasured"), high: u(8192, "unmeasured"),
+    },
+  },
+  claude: {
+    label: "Claude",
+    thinking: {},
+    noThinking: {},
+    effort: {
+      off: us("low", CLAUDE_OFF), low: us("low", CLAUDE_EFFORT),
+      medium: us("medium", CLAUDE_EFFORT), high: us("high", CLAUDE_EFFORT),
+    },
+    canTurnOff: false,
+    reserve: {
+      off: u(2048, CLAUDE_RESERVE), low: u(2048, CLAUDE_RESERVE), medium: u(4096, CLAUDE_RESERVE), high: u(16000, CLAUDE_RESERVE),
+    },
+    unsupportedFields: {
+      temperature: cn("HTTP 400 on Claude 4.7 and newer", CLAUDE_SAMPLING),
+      top_p: cn("HTTP 400 on Claude 4.7 and newer", CLAUDE_SAMPLING),
+      top_k: cn("HTTP 400 on Claude 4.7 and newer", CLAUDE_SAMPLING),
+      min_p: cn("not a Claude parameter", CLAUDE_SAMPLING),
+      presence_penalty: cn("not a Claude parameter (ignored by the compatibility layer)", CLAUDE_SAMPLING),
     },
   },
 };
@@ -162,6 +218,16 @@ export const BACKENDS: Record<BackendId, BackendProfile> = {
     },
     source: "llm-configs openwebui-api.md § Welche Parameter ankommen (Open WebUI 0.11.3, 2026-09-17)",
   },
+  anthropic: {
+    label: "Anthropic",
+    fields: {
+      temperature: "unsupported", top_p: "unsupported", top_k: "unsupported", min_p: "unsupported",
+      presence_penalty: "unsupported", reasoning_effort: "accepted", max_tokens: "accepted",
+    },
+    source: "Anthropic docs (claude-api skill 2026-10-06): no sampling fields (400 on Claude 4.7 and newer), depth through output_config.effort, max_tokens required and includes the thinking; not called by us",
+    effortParam: "effort",
+    effortValues: ["low", "medium", "high", "xhigh", "max"],
+  },
   ollama: { label: "Ollama", fields: STANDARD_ONLY, source: "unmeasured: standard fields only" },
   openai: { label: "OpenAI", fields: STANDARD_ONLY, source: "unmeasured: standard fields only" },
   unknown: { label: "unknown", fields: STANDARD_ONLY, source: "unknown backend: standard fields only" },
@@ -172,6 +238,17 @@ export const FAMILY_PATTERNS: readonly [RegExp, FamilyId][] = [
   [/qwen3\.6/i, "qwen3.6"],
   [/gemma[-_]?4/i, "gemma4"],
   [/gpt-oss/i, "gpt-oss"],
+  // Claude 4.7 and newer, where the sampling fields are refused with HTTP 400 (the family's `unsupportedFields`): fable, mythos,
+  // opus 4.7/4.8/5…, sonnet 5…, haiku 5…. Earlier models (Opus 4.6, Sonnet 4.6, Haiku 4.5, …) accept sampling and stay
+  // unplaced, as do `claude-3-…`, the order distills write (`Claude-4.6-Opus`) and names that only start with the word
+  // (`claude-forge`). Last on purpose: a local distill that carries both names (`qwen3.6-claude-opus-distill`) is the family of
+  // its weights. A new generation needs a line here, and a test.
+  [/claude-fable/i, "claude"],
+  [/claude-mythos/i, "claude"],
+  [/claude-opus-5/i, "claude"],
+  [/claude-opus-4-[78]/i, "claude"],
+  [/claude-sonnet-5/i, "claude"],
+  [/claude-haiku-5/i, "claude"],
 ];
 
 /** Model family as SHOWN (label, origin), decoupled from the tuning key. `FamilyId` keys
@@ -189,6 +266,7 @@ export const MODEL_FAMILIES: Record<ModelFamilyId, ModelFamilyInfo> = {
   "qwen3.6": { label: FAMILIES["qwen3.6"].label, sampling: "qwen3.6" },
   "gemma4": { label: FAMILIES["gemma4"].label, sampling: "gemma4" },
   "gpt-oss": { label: FAMILIES["gpt-oss"].label, sampling: "gpt-oss" },
+  "claude": { label: FAMILIES["claude"].label, sampling: "claude" },
   "apple-fm": { label: "Apple Foundation Models", sampling: null },
 };
 
@@ -202,6 +280,41 @@ export function samplingFamilyOf(id: ModelFamilyId): FamilyId | null {
 export function familyFromName(model: string): FamilyId | null {
   for (const [re, id] of FAMILY_PATTERNS) if (re.test(model)) return id;
   return null;
+}
+
+/** An id only counts if the table holds it itself: `constructor` and `__proto__` are keys of every object. A table is
+ *  always older than the newest manager, so an id it does not know is a case, not an error (found by claude-w23: the
+ *  backend `anthropic` against a copy that had not heard of it threw a TypeError out of `resolveRequestParams`). */
+const isKnownFamily = (f: unknown): f is FamilyId => typeof f === "string" && Object.hasOwn(FAMILIES, f);
+const isKnownBackend = (b: unknown): b is BackendId => typeof b === "string" && Object.hasOwn(BACKENDS, b);
+/** An id as text for `unrecognised`, whatever it is (`String()` throws for a null-prototype object or a throwing `toString`). */
+const idText = (v: unknown): string => (typeof v === "string" ? v : Object.prototype.toString.call(v));
+const UNKNOWN_SRC = "family not in this table: generic values";
+const UNKNOWN_EFFORT: Record<ThinkingLevel, Sourced<string>> = {
+  off: us("none", UNKNOWN_SRC), low: us("low", UNKNOWN_SRC), medium: us("medium", UNKNOWN_SRC), high: us("high", UNKNOWN_SRC),
+};
+const UNKNOWN_RESERVE: Record<ThinkingLevel, Sourced<number>> = {
+  off: u(0, UNKNOWN_SRC), low: u(0, UNKNOWN_SRC), medium: u(0, UNKNOWN_SRC), high: u(0, UNKNOWN_SRC),
+};
+
+/** The thinking table of a family on one backend: the family's own, with what that backend changes laid over it
+ *  (gemma 4 on LM Studio: `none` is ignored, so `off` is `low` and `canTurnOff` is false). `backend` absent = the
+ *  family as such. A new top-level object, but the `Sourced` entries are the tables' own (and the generic table of an unknown
+ *  family is shared): read, do not change them. */
+export function familyThinking(family: FamilyId, backend: BackendId | undefined): {
+  effort: Record<ThinkingLevel, Sourced<string>>;
+  canTurnOff: boolean;
+  reserve: Record<ThinkingLevel, Sourced<number>>;
+} {
+  // An id this table does not know (a newer manager than this copy): the generic table, can be turned off as far as we know.
+  if (!isKnownFamily(family)) return { effort: UNKNOWN_EFFORT, canTurnOff: true, reserve: UNKNOWN_RESERVE };
+  const fam = FAMILIES[family];
+  const over = backend !== undefined && isKnownBackend(backend) ? fam.byBackend?.[backend] : undefined;
+  return {
+    effort: { ...fam.effort, ...over?.effort },
+    canTurnOff: over?.canTurnOff ?? fam.canTurnOff,
+    reserve: { ...fam.reserve, ...over?.reserve },
+  };
 }
 
 export interface ResolveInput {
@@ -221,6 +334,9 @@ export type FieldOrigin = "mode" | "family" | "override" | "reserve" | "plugin";
 export type FieldNote = "raised-to-reserve" | "raised-to-thinking-floor" | "below-thinking-floor" | "off-not-possible";
 export interface FieldExplain {
   field: FieldId;
+  /** Set on EVERY row when the request named a backend and/or a family this table does not know: the row was decided as
+   *  `unknown` for these (see {@link ResolvedRequest.unrecognised} for the ids). */
+  fallback?: ("backend" | "family")[];
   value?: number | string;
   state: FieldState;
   origin?: FieldOrigin;
@@ -228,7 +344,13 @@ export interface FieldExplain {
   evidence?: Evidence;
   note?: FieldNote;
 }
-export interface ResolvedRequest { params: Record<string, number | string>; explain: FieldExplain[] }
+export interface ResolvedRequest {
+  params: Record<string, number | string>;
+  explain: FieldExplain[];
+  /** The ids the table does not know, as they were passed — present only then. They were treated as `unknown`
+   *  (backend: standard fields only; family: no family values), no exception. */
+  unrecognised?: { backend?: string; family?: string };
+}
 
 export const GENERIC_EFFORT: Record<ThinkingLevel, string> = { off: "none", low: "low", medium: "medium", high: "high" };
 export const FAMILY_FIELDS: readonly FamilyField[] = ["top_p", "top_k", "min_p", "presence_penalty"];
@@ -241,8 +363,16 @@ function support(backend: BackendId, field: FieldId, familyKnown: boolean): Fiel
   return BACKENDS[backend].fields[field];
 }
 
-export function resolveRequestParams(input: ResolveInput): ResolvedRequest {
+export function resolveRequestParams(rawInput: ResolveInput): ResolvedRequest {
+  const unrecognised: { backend?: string; family?: string } = {};
+  const backendKnown = isKnownBackend(rawInput.backend);
+  if (!backendKnown) unrecognised.backend = idText(rawInput.backend);
+  const familyKnown = !rawInput.family || isKnownFamily(rawInput.family);
+  if (!familyKnown) unrecognised.family = idText(rawInput.family);
+  const input: ResolveInput = { ...rawInput, backend: backendKnown ? rawInput.backend : "unknown", family: familyKnown ? (rawInput.family ?? null) : null };
+  const fallback: ("backend" | "family")[] = [...(backendKnown ? [] : ["backend" as const]), ...(familyKnown ? [] : ["family" as const])];
   const fam = input.family ? FAMILIES[input.family] : null;
+  const think = input.family ? familyThinking(input.family, input.backend) : null;
   const thinkingOn = input.thinking !== "off";
   const ov = input.overrides ?? {};
   const candidates = new Map<FieldId, Candidate | "unknown-family" | "no-value">();
@@ -272,10 +402,10 @@ export function resolveRequestParams(input: ResolveInput): ResolvedRequest {
   // 3. reasoning_effort
   if (typeof ov.reasoning_effort === "string") {
     candidates.set("reasoning_effort", { value: ov.reasoning_effort, origin: "override" });
-  } else if (fam) {
-    const e = fam.effort[input.thinking];
+  } else if (think) {
+    const e = think.effort[input.thinking];
     const c: Candidate = { value: e.value, origin: "family", source: e.source, evidence: e.evidence };
-    if (input.thinking === "off" && !fam.canTurnOff) c.note = "off-not-possible";
+    if (input.thinking === "off" && !think.canTurnOff) c.note = "off-not-possible";
     candidates.set("reasoning_effort", c);
   } else {
     candidates.set("reasoning_effort", { value: GENERIC_EFFORT[input.thinking], origin: "mode" });
@@ -286,7 +416,7 @@ export function resolveRequestParams(input: ResolveInput): ResolvedRequest {
   if (base === undefined) {
     candidates.set("max_tokens", "no-value");
   } else {
-    const reserve = fam?.reserve[input.thinking];
+    const reserve = think?.reserve[input.thinking];
     if (reserve && base < reserve.value) {
       candidates.set("max_tokens", { value: reserve.value, origin: "reserve", source: reserve.source, evidence: reserve.evidence, note: "raised-to-reserve" });
     } else {
@@ -299,9 +429,16 @@ export function resolveRequestParams(input: ResolveInput): ResolvedRequest {
   const explain: FieldExplain[] = [];
   for (const field of FIELD_ORDER) {
     const c = candidates.get(field);
-    if (c === undefined || c === "no-value") { explain.push({ field, state: "not-sent-no-value" }); continue; }
+    const refused = fam?.unsupportedFields?.[field];
+    if (c === undefined || c === "no-value") {
+      // A field the family refuses is reported as refused even where the table holds no value for it.
+      explain.push(refused ? { field, state: "not-sent-unsupported", source: refused.source, evidence: refused.evidence } : { field, state: "not-sent-no-value" });
+      continue;
+    }
     if (c === "unknown-family") { explain.push({ field, state: "not-sent-unknown-family" }); continue; }
-    const s = support(input.backend, field, fam !== null);
+    const effortValues = field === "reasoning_effort" ? BACKENDS[input.backend].effortValues : undefined;
+    const outOfList = effortValues !== undefined && !effortValues.includes(String(c.value));
+    const s = refused || outOfList ? "unsupported" : support(input.backend, field, fam !== null);
     const row: FieldExplain = { field, value: c.value, origin: c.origin, state: "sent-effective" };
     if (c.source !== undefined) row.source = c.source;
     if (c.evidence !== undefined) row.evidence = c.evidence;
@@ -309,11 +446,17 @@ export function resolveRequestParams(input: ResolveInput): ResolvedRequest {
     if (s === "ignored" || s === "unsupported") {
       row.state = s === "ignored" ? "not-sent-ignored" : "not-sent-unsupported";
       delete row.value;
+      // The reason the family refuses the field replaces the source of the value that was not sent.
+      if (refused) { row.source = refused.source; row.evidence = refused.evidence; }
     } else {
       row.state = s === "effective" ? "sent-effective" : "sent-unproven";
-      params[field] = c.value;
+      params[field === "reasoning_effort" ? (BACKENDS[input.backend].effortParam ?? field) : field] = c.value;
     }
     explain.push(row);
+  }
+  if (fallback.length > 0) {
+    for (const row of explain) row.fallback = fallback;
+    return { params, explain, unrecognised };
   }
   return { params, explain };
 }
@@ -491,15 +634,18 @@ export function mapTruncated<R extends ChatOutcome>(r: R, policy: TruncatedPolic
 
 /** Deviations between what the profile asked for and what came back. No retry logic here:
  *  a silent retry would hide exactly what the settings UI is meant to show. */
-export function checkResponse(ctx: { family: FamilyId | null; thinking: ThinkingLevel }, r: ResponseFacts): Deviation[] {
+export function checkResponse(ctx: { family: FamilyId | null; thinking: ThinkingLevel; backend?: BackendId }, r: ResponseFacts): Deviation[] {
   if (r.status === 400) return [{ kind: "rejected", affectsResult: true, detail: r.errorText ?? "" }];
   const out: Deviation[] = [];
-  const thought = reasoningHappened(r.content, r.reasoning);
-  const canTurnOff = ctx.family ? FAMILIES[ctx.family].canTurnOff : true;
-  if (ctx.thinking === "off" && canTurnOff && thought) out.push({ kind: "thinking-despite-off", affectsResult: false });
-  const visible = stripThinkBlocks(r.content).trim();
-  if (visible === "" && thought && r.finishReason === "length") out.push({ kind: "empty-by-budget", affectsResult: true });
   const seen = r.responseModel ? familyFromName(r.responseModel) : null;
+  // gemma 4 writes its thought into `content` as `…<channel|>` when `none` is ignored; that is read for the family only.
+  const channel = (ctx.family ?? seen) === "gemma4";
+  const thought = reasoningHappened(r.content, r.reasoning, { channel });
+  // Per backend: gemma 4 on LM Studio cannot be turned off, its thought under `off` is the request, not a deviation.
+  const canTurnOff = ctx.family ? familyThinking(ctx.family, ctx.backend).canTurnOff : true;
+  if (ctx.thinking === "off" && canTurnOff && thought) out.push({ kind: "thinking-despite-off", affectsResult: false });
+  const visible = stripThinkBlocks(r.content, { channel }).trim();
+  if (visible === "" && thought && r.finishReason === "length") out.push({ kind: "empty-by-budget", affectsResult: true });
   if (seen && ctx.family && seen !== ctx.family) out.push({ kind: "family-mismatch", affectsResult: true, detail: seen });
   if (seen && !ctx.family) out.push({ kind: "family-detected", affectsResult: true, detail: seen });
   return out;

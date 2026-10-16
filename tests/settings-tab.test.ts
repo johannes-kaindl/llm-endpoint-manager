@@ -177,7 +177,7 @@ describe("LlmEndpointManagerSettingTab", () => {
     const row = settings.find((s) => s.nameValue === "verdigado-pro")!;
     const dd = row.components.find((c): c is DropdownComponent => c instanceof DropdownComponent)!;
     expect(dd.getValue()).toBe("gpt-oss");
-    expect(Object.keys(dd.options)).toEqual(["", "qwen3.8", "qwen3.6", "gemma4", "gpt-oss"]);
+    expect(Object.keys(dd.options)).toEqual(["", "qwen3.8", "qwen3.6", "gemma4", "gpt-oss", "claude"]);
     const backend = settings.find((s) => s.components.some((c) => c instanceof DropdownComponent && (c as DropdownComponent).getValue() === "openwebui"));
     expect(backend).toBeDefined();
   });

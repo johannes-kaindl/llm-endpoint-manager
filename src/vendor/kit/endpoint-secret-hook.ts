@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.60.1, src/pure/endpoint-secret-hook.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.61.0, src/pure/endpoint-secret-hook.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 import type { EndpointConfig } from "./endpoint_config";
 
 /** Schlüssel-Hook: der Consumer hält das Token woanders (Obsidian-Schlüsselbund, Kit-Modul

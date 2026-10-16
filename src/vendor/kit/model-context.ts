@@ -1,4 +1,4 @@
-// vendored from code-kit@0.27.1, src/ts/pure/model-context.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from code-kit@0.28.0, src/ts/pure/model-context.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 import type { CapabilityFetch } from "./capabilities";
 import { withTimeout, type TimeoutTimers } from "./timeout";
 
