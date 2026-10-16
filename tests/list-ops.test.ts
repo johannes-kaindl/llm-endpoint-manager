@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { byCapability, byTransport, importEndpoints } from "../src/core/list-ops";
+import { byCapability, byTransport, importEndpoints, orphanSecretIds } from "../src/core/list-ops";
 import type { ManagedEndpoint } from "../src/core/model";
 
 const ep = (o: Partial<ManagedEndpoint> & { url: string }): ManagedEndpoint => ({
@@ -62,5 +62,23 @@ describe("importEndpoints", () => {
     const out = importEndpoints([], [{ url: " " }, { url: "http://b" }, { url: "http://b/" }], "chat", mint, () => false);
     expect(out.result.added).toEqual(["b"]);
     expect(out.result.skipped.length).toBe(2);
+  });
+});
+
+describe("orphanSecretIds", () => {
+  const P = "llm-endpoint-manager";
+  it("meldet Schlüsselbund-Einträge des Plugins, auf die kein Endpunkt zeigt", () => {
+    const eps = [ep({ id: "e1", url: "a", secretId: `${P}-e1` })];
+    expect(orphanSecretIds([`${P}-e1`, `${P}-alt`, `${P}-alt2`], eps)).toEqual([`${P}-alt`, `${P}-alt2`]);
+  });
+  it("fremde Einträge (anderes Präfix) zählen nie als verwaist", () => {
+    expect(orphanSecretIds(["koda-agent-x", "llm-endpoint-managers-x", P], [])).toEqual([]);
+  });
+  it("der Standard-Schlüssel eines vorhandenen Endpunkts gilt als belegt, auch wenn dessen secretId fehlt (Import verknüpft ihn wieder)", () => {
+    const eps = [ep({ id: "E1", url: "a" })];
+    expect(orphanSecretIds([`${P}-e1`], eps)).toEqual([]);
+  });
+  it("ohne Einträge im Schlüsselbund nichts", () => {
+    expect(orphanSecretIds([], [ep({ id: "e1", url: "a", secretId: `${P}-e1` })])).toEqual([]);
   });
 });

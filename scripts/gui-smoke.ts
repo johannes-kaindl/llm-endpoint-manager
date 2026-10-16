@@ -64,6 +64,7 @@ const PUNKTE = [
   "D3 „Erkennen“ gegen Fake-LM-Studio liefert lmstudio (nur Lesen, kein Modell-Load)",
   "G1 Preset Apple Intelligence (on-device) → Zeile mit transport=shortcuts, Kurzbefehl-Name, KEIN HTTP-Ziel, Modellzeile apple-fm (displayFamily) und Modellblock aus Kit-Daten",
   "G2 Filter-Default: list() ohne transports-Opt-in zeigt apple-shortcuts NICHT, list({transports:[\"shortcuts\"]}) UND resolve() bleibt bei http; der Opt-in-Eintrag traegt displayFamily apple-fm",
+  "H1 Verwaiste Schlüsselbund-Einträge: Zeile mit Zahl und Knopf „Clean up“, Bestätigung, danach Eintrag gelöscht und Zeile weg",
 ] as const;
 const { record, abschluss } = createBilanz({ punkte: PUNKTE });
 
@@ -631,6 +632,37 @@ async function main(): Promise<void> {
       !filterRes.defaultIds.includes("apple-shortcuts") && filterRes.optInIds.includes("apple-shortcuts") && filterRes.resolveProvider !== "apple-shortcuts"
         && JSON.stringify(filterRes.optInModels) === JSON.stringify([{ id: "apple-fm", displayFamily: "apple-fm" }]),
       JSON.stringify(filterRes),
+    );
+
+    // --- H1: verwaiste Schluesselbund-Eintraege (Welle 23) --------------------------------
+    console.log("\nH · Schluesselbund aufraeumen");
+    const orphanId = `${PLUGIN_ID}-gui-smoke-orphan`;
+    await cdp.evaluate(`app.secretStorage.setSecret(${q(orphanId)}, "orphan-token"); return true;`);
+    settings = await reopenSettings(cdp, port, settings);
+    const orphanRow = (): Promise<{ text: string; button: string; visible: boolean } | null> => settings!.cdp.evaluate(`
+      const rows = Array.from(${settings!.el(`root.querySelectorAll(".setting-item")`)});
+      const r = rows.find((x) => /unused token|ungenutzte? Token/.test(x.querySelector(".setting-item-name")?.textContent ?? ""));
+      if (!r) return null;
+      const b = r.querySelector("button");
+      const box = r.getBoundingClientRect();
+      return { text: r.querySelector(".setting-item-name").textContent, button: b ? b.textContent : "", visible: box.width > 0 && box.height > 0 };
+    `);
+    const before = await orphanRow();
+    const cleanClicked = before
+      ? await clickReal(settings.cdp, settings.el(`Array.from(root.querySelectorAll(".setting-item")).find((x) => /unused token|ungenutzte? Token/.test(x.querySelector(".setting-item-name")?.textContent ?? "")).querySelector("button")`))
+      : false;
+    // Die Bestaetigung ist ein Modal; vor ihr ist nichts geloescht.
+    const confirmExpr = `Array.from(document.querySelectorAll(".modal-container .modal-button-container button")).find((b) => ["Delete", "Löschen"].includes(b.textContent.trim()))`;
+    const confirmCdp = (await pollUntil<{ ok: boolean }>(cdp, `return ${confirmExpr} ? { ok: true } : null;`, 4000, 200).catch(() => null)) ? cdp : settings.cdp;
+    const stillThere = await cdp.evaluate<boolean>(`return app.secretStorage.getSecret(${q(orphanId)}) === "orphan-token";`);
+    const confirmClicked = await clickReal(confirmCdp, confirmExpr);
+    const gone = await pollUntil<{ ok: boolean }>(cdp, `return (app.secretStorage.getSecret(${q(orphanId)}) ?? "") === "" ? { ok: true } : null;`, 6000, 200).catch(() => null);
+    settings = await reopenSettings(cdp, port, settings);
+    const after = await orphanRow();
+    record(
+      "H1 Verwaiste Schlüsselbund-Einträge: Zeile mit Zahl und Knopf „Clean up“, Bestätigung, danach Eintrag gelöscht und Zeile weg",
+      before !== null && before.visible && ["Clean up", "Aufräumen"].includes(before.button) && cleanClicked && stillThere && confirmClicked && gone !== null && after === null,
+      JSON.stringify({ before, cleanClicked, stillThere, confirmClicked, gone: gone !== null, after }),
     );
   } finally {
     // B haengt seinen Fake-Endpunkt am Ende NICHT selbst aus — ohne diesen Schritt hinterlaesst

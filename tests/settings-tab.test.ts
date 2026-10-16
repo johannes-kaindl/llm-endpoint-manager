@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { requestUrl } from "obsidian";
-import { makeFakeApp, Setting, TextComponent, ToggleComponent, DropdownComponent, ButtonComponent, ExtraButtonComponent } from "./vendor/kit/obsidian-mock";
+import { makeFakeApp, Modal, Setting, TextComponent, ToggleComponent, DropdownComponent, ButtonComponent, ExtraButtonComponent } from "./vendor/kit/obsidian-mock";
 import LlmEndpointManagerPlugin from "../src/main";
 import { helpSettingDefinition } from "../src/vendor/kit-obsidian/help-setting";
 import { LlmEndpointManagerSettingTab, helpOptions, presetText } from "../src/obsidian/settings-tab";
@@ -146,6 +146,30 @@ describe("LlmEndpointManagerSettingTab", () => {
     const { el } = await tab({}, app);
     expect(el.textContent).toContain("1.11.4");
     expect(el.textContent).toContain("No plugin has asked");   // pickLang(null) faellt auf en, da der Mock keine getLanguage liefert
+  });
+  it("Schlüsselbund-Gruppe: verwaiste Einträge werden gezählt und erst nach Bestätigung per Knopf gelöscht", async () => {
+    const app = makeFakeApp();
+    app.secretStorage.listSecrets = (): string[] => [...(app.secretStorage.__secrets as Map<string, string>).keys()];
+    app.secretStorage.setSecret("llm-endpoint-manager-alt1", "x");
+    app.secretStorage.setSecret("llm-endpoint-manager-alt2", "y");
+    const { el, plugin } = await tab({ endpoints: [{ id: "e1", url: "http://a" }] }, app);
+    const row = settingsIn(el).find(s => s.nameValue.includes("2 unused tokens"));
+    expect(row).toBeDefined();
+    const btn = row!.components.find((c): c is ButtonComponent => c instanceof ButtonComponent)!;
+    void btn.clickCB?.();   // wartet auf die Bestätigung, deshalb nicht abwarten
+    // Vor der Bestätigung ist nichts gelöscht.
+    expect(plugin.orphanSecrets().length).toBe(2);
+    const confirm = (Modal.__last!.contentEl.querySelectorAll("button") as Array<{ __component: ButtonComponent }>).map(b => b.__component);
+    expect(confirm.map(b => b.textValue)).toEqual(["Cancel", "Delete"]);
+    confirm[1]!.clickCB?.();
+    await new Promise(r => setTimeout(r, 0));
+    expect(plugin.orphanSecrets()).toEqual([]);
+  });
+  it("Schlüsselbund-Gruppe: ohne verwaiste Einträge keine Aufräum-Zeile", async () => {
+    const app = makeFakeApp();
+    app.secretStorage.listSecrets = (): string[] => [...(app.secretStorage.__secrets as Map<string, string>).keys()];
+    const { el } = await tab({ endpoints: [{ id: "e1", url: "http://a" }] }, app);
+    expect(settingsIn(el).some(s => /unused token/.test(s.nameValue))).toBe(false);
   });
   it("shows stored model rows with family dropdown and a backend row per endpoint", async () => {
     const { el } = await tab({ endpoints: [{ id: "o", label: "LGS", url: "https://h/api", capabilities: ["chat"], backend: "openwebui", models: [{ id: "verdigado-pro", family: "gpt-oss" }] }] });

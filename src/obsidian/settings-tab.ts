@@ -1,6 +1,7 @@
 import { App, Notice, PluginSettingTab, Setting, type ButtonComponent, type SettingDefinitionItem } from "obsidian";
 import type LlmEndpointManagerPlugin from "../main";
 import { getLang, t } from "../vendor/kit/i18n";
+import { confirmAction } from "../vendor/kit-obsidian/confirm";
 import { renderSettingDefinitions, settingBodyHost, refreshSettingsTab } from "../vendor/kit-obsidian/settings_walker";
 import { githubHelpUrls, helpSettingDefinition, type HelpSettingOptions } from "../vendor/kit-obsidian/help-setting";
 import { buildEndpointList, type EndpointListStrings, type EndpointSecretHook } from "../vendor/kit-obsidian/endpoint-list";
@@ -445,6 +446,28 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
   private renderKeychainStatus(setting: Setting): void {
     const host = settingBodyHost(setting);
     host.createDiv({ cls: "lem-keychain-status", text: this.plugin.keychain ? t("set.keychainOk") : t("set.keychainMissing") });
+    this.renderOrphans(host);
+  }
+
+  /** Verwaiste Schlüsselbund-Einträge: nur zählen und auf Knopfdruck (mit Bestätigung) entfernen,
+   *  nie automatisch (Entscheidung Johannes 2026-10-15). Ohne Treffer keine Zeile. */
+  private renderOrphans(host: HTMLElement): void {
+    const count = this.plugin.orphanSecrets().length;
+    if (count === 0) return;
+    new Setting(host)
+      .setName(count === 1 ? t("set.orphansOne") : t("set.orphansMany", String(count)))
+      .setDesc(t("set.orphansDesc"))
+      .addButton((b) => b.setButtonText(t("set.orphansClean")).onClick(async () => {
+        const n = this.plugin.orphanSecrets().length;
+        if (n === 0) { this.refreshUi(); return; }
+        const ok = await confirmAction(this.app, {
+          title: t("set.orphansConfirmTitle"), message: t("set.orphansConfirm", String(n)),
+          confirmLabel: t("set.orphansDelete"), cancelLabel: t("set.orphansCancel"),
+        });
+        if (!ok) return;
+        new Notice(t("notice.orphansCleaned", String(this.plugin.cleanOrphanSecrets())));
+        this.refreshUi();
+      }));
   }
 
   private renderConsumers(setting: Setting): void {

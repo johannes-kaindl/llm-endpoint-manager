@@ -5,6 +5,7 @@ import { MemorySecretStore, type SecretStore } from "./vendor/kit/secrets";
 import { obsidianSecretStore, secretStorageAvailable } from "./vendor/kit-obsidian/secrets";
 import { createManagerApi, type ManagerApiHandle } from "./core/api";
 import { LLM_ENDPOINT_MANAGER_PLUGIN_ID, type LlmEndpointManagerApi } from "./core/api-types";
+import { orphanSecretIds } from "./core/list-ops";
 import { loadSettings, newId, secretIdOf, toPersisted, type ManagedEndpoint, type ManagerSettings } from "./core/model";
 import { listModels, probeReachable } from "./obsidian/http";
 import { createShortcutsBridge, type ShortcutsBridge } from "./vendor/kit-obsidian/shortcuts-bridge";
@@ -78,6 +79,22 @@ export default class LlmEndpointManagerPlugin extends Plugin {
   forgetEndpoint(ep: ManagedEndpoint): void {
     if (ep.secretId) this.secrets.delete(ep.secretId);
     this.handle.invalidateUrl(ep.url);
+  }
+
+  /** Schlüsselbund-Einträge dieses Plugins ohne Endpunkt (mit Wert). `listSecrets` gibt es seit 1.11.4 als Teil
+   *  der API; per Form geprüft, weil der Fallback-Store (ohne Schlüsselbund) keine Liste führt. */
+  orphanSecrets(): string[] {
+    if (!this.keychain) return [];
+    const storage = (this.app as { secretStorage?: { listSecrets?: () => string[] } }).secretStorage;
+    if (typeof storage?.listSecrets !== "function") return [];
+    return orphanSecretIds(storage.listSecrets().filter((id) => this.secrets.has(id)), this.settings.endpoints);
+  }
+
+  /** Löscht die verwaisten Einträge; nur auf ausdrücklichen Knopfdruck (nie beim Start). */
+  cleanOrphanSecrets(): number {
+    const ids = this.orphanSecrets();
+    for (const id of ids) this.secrets.delete(id);
+    return ids.length;
   }
 
   async removeEndpoint(id: string): Promise<void> {

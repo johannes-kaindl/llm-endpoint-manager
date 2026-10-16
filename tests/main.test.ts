@@ -47,4 +47,25 @@ describe("LlmEndpointManagerPlugin", () => {
     await p.onload();
     expect(p.keychain).toBe(false);
   });
+  it("orphanSecrets zählt nur belegte Einträge ohne Endpunkt, cleanOrphanSecrets räumt genau diese", async () => {
+    const app = makeFakeApp();
+    app.secretStorage.listSecrets = (): string[] => [...(app.secretStorage.__secrets as Map<string, string>).keys()];
+    const p = plugin({ endpoints: [{ id: "e1", url: "http://a" }] }, app);
+    await p.onload();
+    await p.setSecret(p.settings.endpoints[0]!, "keep");
+    app.secretStorage.setSecret("llm-endpoint-manager-alt", "x");
+    app.secretStorage.setSecret("llm-endpoint-manager-leer", "");   // von Obsidian nur „gelöscht“ (Leerstring)
+    app.secretStorage.setSecret("koda-agent-key", "fremd");
+    expect(p.orphanSecrets()).toEqual(["llm-endpoint-manager-alt"]);
+    expect(p.cleanOrphanSecrets()).toBe(1);
+    expect(p.secrets.get("llm-endpoint-manager-alt")).toBeNull();
+    expect(p.secrets.get("llm-endpoint-manager-e1")).toBe("keep");
+    expect(app.secretStorage.getSecret("koda-agent-key")).toBe("fremd");
+    expect(p.orphanSecrets()).toEqual([]);
+  });
+  it("orphanSecrets ohne listSecrets (ältere API) wirft nicht und liefert nichts", async () => {
+    const p = plugin({}, makeFakeApp());
+    await p.onload();
+    expect(p.orphanSecrets()).toEqual([]);
+  });
 });

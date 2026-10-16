@@ -1,6 +1,7 @@
 import { normalizeEndpoint } from "../vendor/kit/endpoint";
 import type { EndpointConfig } from "../vendor/kit/endpoint_config";
-import { labelFromUrl, secretIdOf, type Capability, type EndpointTransport, type ManagedEndpoint } from "./model";
+import type { ImportResult } from "./api-types";
+import { SECRET_PREFIX, labelFromUrl, secretIdOf, type Capability, type EndpointTransport, type ManagedEndpoint } from "./model";
 
 export function byCapability(eps: ManagedEndpoint[], cap?: Capability): ManagedEndpoint[] {
   return cap ? eps.filter((e) => e.capabilities.includes(cap)) : [...eps];
@@ -15,7 +16,6 @@ export function byTransport(eps: ManagedEndpoint[], transports?: EndpointTranspo
   return eps.filter((e) => wanted.includes(e.transport ?? "http"));
 }
 
-export interface ImportResult { added: string[]; merged: string[]; skipped: string[] }
 export interface ImportOutcome {
   endpoints: ManagedEndpoint[];
   result: ImportResult;
@@ -64,4 +64,16 @@ export function importEndpoints(
     result.added.push(entry.label);
   }
   return { endpoints, result, secrets };
+}
+
+/** Schlüsselbund-Einträge dieses Plugins (Präfix `llm-endpoint-manager-`), auf die kein Endpunkt zeigt.
+ *  Belegt gilt auch die Standard-ID eines vorhandenen Endpunkts ohne `secretId`: der Import verknüpft
+ *  sie wieder (siehe `importEndpoints`). `stored` sind bereits nur die Einträge mit Wert — Obsidian
+ *  „löscht“ durch den Leerstring, der Eintrag bleibt in `listSecrets()` stehen. Gelöscht wird nie
+ *  automatisch: ein zweites Gerät mit noch nicht synchronisierter `data.json` kann den Eintrag brauchen. */
+export function orphanSecretIds(stored: string[], eps: ManagedEndpoint[]): string[] {
+  const used = new Set<string>();
+  for (const e of eps) { if (e.secretId) used.add(e.secretId); used.add(secretIdOf(e.id)); }
+  const prefix = `${SECRET_PREFIX}-`;
+  return stored.filter((id) => id.startsWith(prefix) && !used.has(id));
 }

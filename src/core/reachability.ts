@@ -30,7 +30,6 @@ export function createReachabilityCache(now: () => number, ttlMs: number = REACH
   };
 }
 
-export type ResolveError = "no-endpoint" | "not-found" | "disabled" | "secret-missing" | "unreachable";
 export interface Materialized { ep: ManagedEndpoint; config: EndpointConfig }
 
 /** ManagedEndpoint → code-kit EndpointConfig mit Token aus dem Schlüsselbund. Das Token kommt
