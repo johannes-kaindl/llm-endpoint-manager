@@ -6,7 +6,7 @@ Workspace-weite Standards (comply-or-explain): siehe [`../../workspace/_docs/CON
 
 **Profil:** `ts-node` · `obsidian-plugin`.
 
-**Stand 2026-10-14: 0.7.0 (Sampling-Profile-Modelltabelle seit 0.2.0); Plan 2 seit 0.1.0 released.** Alle 13 Tasks aus Plan 2 umgesetzt: Kern-Datenmodell,
+**Stand 2026-10-16: 0.8.0 released, Claude-API-Anbieter (Welle 23) in Arbeit für 0.9.0 (Sampling-Profile-Modelltabelle seit 0.2.0); Plan 2 seit 0.1.0 released.** Alle 13 Tasks aus Plan 2 umgesetzt: Kern-Datenmodell,
 Plugin-API v1 (`createManagerApi`, „Fehler sind Werte"), HTTP-Probe, Settings-Tab (Endpunkt-Liste,
 Protokoll/Fähigkeiten/Aktiv-Schalter), i18n, Schlüsselbund-Verdrahtung (`obsidianSecretStore`),
 GUI-Smoke 9/9. Vendoring auf obsidian-kit 0.36.1 + code-kit 0.6.0, `npm run gate` grün. Tag + Forgejo-Release
@@ -67,6 +67,10 @@ tests/vendor/kit/     vendorter Obsidian-Mock (obsidian-mock.ts)
   verbatim-Snapshots sind, nicht Verantwortung dieses Repos.
 
 ## Gotchas
+
+- **Der Anbieter `anthropic` ist hinter dem Transport-Opt-in versteckt, und das ist der Schutz für ältere Plugins.** `ManagedEndpoint.transport` ist für `provider: "anthropic"` immer `"anthropic"` (`normalizeEndpointEntry`, `withProvider`), `list()` ohne `transports` und `resolve()` ohne `transports` liefern nur `http` (`autoResolvable` in `src/core/reachability.ts`). Gemessen mit einem Plugin auf Kit 0.60.1 (json-editor, Wegwerf-Klon): bekäme es den Endpunkt mit `backend: "anthropic"`, stürzte `complete()` ab (`BACKENDS[backend].fields` undefiniert), ohne `backend` ginge eine OpenAI-Anfrage mit `temperature` an Anthropic. Mit dem fertigen Manager sieht es ihn nie (Variante A: nur Claude → `no-endpoint`, Variante B: Claude vor LM Studio → LM Studio). Wer einen weiteren Anbieter mit eigener Wire-Form baut, nimmt denselben Weg (eigener Transport-Wert), nicht nur einen neuen `provider`.
+- **Anthropic fragt anders:** die Probe (`probeHeaders` in `src/obsidian/http.ts`) sendet `x-api-key` und `anthropic-version` statt `Authorization: Bearer`, und `GET /v1/models?limit=1000` (ohne `limit` kommen nur 20 Modelle). Der Browser-Header `anthropic-dangerous-direct-browser-access` gehört nicht hierher, sondern in den Transport der Plugins (obsidian-kit `anthropic-transport`): `requestUrl` läuft im Hauptprozess. CORS gemessen am 2026-10-16 (Master, ohne Schlüssel, kostenlos): `OPTIONS /v1/messages` und `/v1/models` mit `Origin: app://obsidian.md` antworten 200 mit `access-control-allow-origin: *` und `access-control-allow-headers: x-api-key,anthropic-version,anthropic-dangerous-direct-browser-access,content-type`. Ob die echte Anfrage mit Schlüssel durchgeht, misst der eine Lauf mit `claude-haiku-5-5` in der Modell-Runde.
+- **Die Knopfreihe der Vorlagen bricht um** (`.lem-presets` in `styles.css`, die Klasse setzt `renderEndpoints` auf die letzte Zeile, die der Kit-Editor anlegt): mit sechs Knöpfen war der letzte im 1000-px-Fenster abgeschnitten. Der Smoke-Punkt I1 prüft `flex-wrap` und dass alle Knöpfe im Fenster liegen.
 
 - **Ein `api.on("changed")`-Listener abonniert einmal, nicht bei jedem Neuzeichnen.** `notifyChanged` iteriert über eine Kopie der Listener (seit 0.8.0); vorher lief ein Listener, der beim Melden neu abonnierte (Unsubscribe plus `on`), in eine Endlosschleife (Renderer 108 % CPU, Smoke-Timeout, Welle 22). Der Settings-Tab abonniert deshalb in `watchChanges()` nur, wenn noch kein Abo steht; eigene Speicherungen des Tabs laufen über `own()`, damit sie ihn nicht neu zeichnen.
 

@@ -10,6 +10,7 @@ Organised after [Diátaxis](https://diataxis.fr/); only the parts that have cont
 |---|---|
 | **[Getting started](getting-started.md)** | Learning-oriented. Add an endpoint, store a token, see which plugin uses it. |
 | **[Set up the Apple shortcut](apple-shortcut.md)** | Task-oriented. Add the on-device endpoint and match it to a Shortcuts shortcut. |
+| **[Use the Claude API](claude-api.md)** | Task-oriented. Add the Anthropic endpoint, store your key, see which plugins can use it. |
 | **[Troubleshooting](troubleshooting.md)** | Task-oriented. Symptom → cause → what to do. |
 | **[API for plugin authors](https://github.com/johannes-kaindl/llm-endpoint-manager/blob/main/README.md#api)** | Reference. The `resolve`/`materialize`/`models` calls and the security boundary, in the README. |
 | **[Apple shortcuts for Obsidian plugins](https://uplink.jkaindl.de/apple-shortcuts)** | Explanation. Why the bridge exists, the shortcuts themselves, and its limits — shared across all plugins that use it. |

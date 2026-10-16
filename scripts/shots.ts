@@ -222,7 +222,7 @@ async function main(): Promise<void> {
     }
     if (want("endpoints")) {
       const box = await ausschnitt(settingsWin, {
-        scrollTo: "rowOf(1)", von: "rowOf(1)", bis: "[...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Check connections')", ...(breite === undefined ? { width: 712 } : {}), padBottom: 20,
+        scrollTo: "rowOf(1)", von: "rowOf(1)", bis: "[...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Check connections')", ...(breite === undefined ? { width: 712 } : {}), padBottom: 4,
       });
       await aufnehmen(settingsWin, breite === undefined ? "endpoints.png" : `endpoints-${breite}.png`, box, outDir);
     }

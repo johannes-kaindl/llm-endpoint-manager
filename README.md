@@ -20,9 +20,10 @@ If several plugins in your vault talk to language models, each one normally asks
 - **Live reachability** — every row shows a status indicator and, on hover, the reason (connection refused, host not found, timeout, "answers, but not like a model API", token rejected). "Check connections" re-tests all rows. A reachable row with a model also shows the model's context length ("Context: loaded N · max M tokens") when the server reports it.
 - **Model table** — per endpoint, every model the server reports plus the ones you already configured. Set a model's **family** (a suggestion is offered from the model name) and mark it as **another spelling of** a second model id, so plugins send the id you prefer.
 - **Backend detection** — "Detect" recognizes LM Studio, Ollama, Open WebUI or a plain OpenAI-compatible server with read-only requests; it never loads a model.
+- **Claude API (Anthropic)** — a preset adds the Claude API as an endpoint of its own kind. Your Anthropic key goes into the keychain, and the request goes from your device straight to Anthropic (the native Messages API, answers streamed, thinking shown as a summary). Plugins that know about Claude pick it up on their own; Koda can use it already, the others follow with their next update. See [Use the Claude API](https://github.com/johannes-kaindl/llm-endpoint-manager/blob/main/docs/claude-api.md).
 - **See who uses it** — the settings tab lists which plugins asked for an endpoint during the current session, and for which capability.
 
-<img src="https://raw.githubusercontent.com/johannes-kaindl/llm-endpoint-manager/main/docs/images/endpoints.png" width="820" alt="The lower endpoint list: an Ollama row that is reachable at position 2, an Office server row with a red indicator, a saved token and the label not reachable, then the add field and the preset buttons LM Studio, Ollama, OpenAI-compatible cloud and Check connections">
+<img src="https://raw.githubusercontent.com/johannes-kaindl/llm-endpoint-manager/main/docs/images/endpoints.png" width="820" alt="The lower endpoint list: an Ollama row that is reachable at position 2, an Office server row with a red indicator, a saved token and the label not reachable, then the add field and the preset buttons LM Studio, Ollama, OpenAI-compatible cloud, Apple Intelligence and Anthropic (Claude API), wrapped onto two lines, and Check connections">
 
 <img src="https://raw.githubusercontent.com/johannes-kaindl/llm-endpoint-manager/main/docs/images/models.png" width="820" alt="The Models group for an LM Studio endpoint: four models with family dropdowns, one suggested family, one model entered as another spelling of qwen/qwen3.8-27b, and the Backend row set to LM Studio with a Detect button">
 
@@ -56,7 +57,7 @@ cd llm-endpoint-manager && npm install && npm run build
 
 The plugin has no commands and no ribbon icon; everything happens in **Settings → LLM Endpoint Manager**.
 
-1. Under **Endpoints**, type an address into the field **Add an endpoint: http://localhost:1234** and click out of the field (rows are saved when a field loses focus) — or click a one-click preset button (**LM Studio**, **Ollama**, **OpenAI-compatible cloud**).
+1. Under **Endpoints**, type an address into the field **Add an endpoint: http://localhost:1234** and click out of the field (rows are saved when a field loses focus) — or click a one-click preset button (**LM Studio**, **Ollama**, **OpenAI-compatible cloud**, **Apple Intelligence (on-device)**, **Anthropic (Claude API)**).
 2. Check the row's **Protocol** and **Capabilities**. A row without a capability is invisible to every plugin and shows a warning.
 3. Optional: paste an **API token (optional)** into the row. It goes into the keychain; the row then shows **token saved**.
 4. Read the status indicator on the row: **active** means this is the endpoint a plugin asking for chat gets right now (the first enabled, reachable one with a usable token), **reachable, position 2** means a better one comes first. Use **Use first** to change the order.
@@ -68,7 +69,7 @@ The plugin has no commands and no ribbon icon; everything happens in **Settings 
 |---|---|---|
 | Address | Base URL of the server. A trailing `/v1` is stripped automatically. | — |
 | Label | Name shown in this tab and to other plugins. | derived from the address |
-| Protocol | Wire format: OpenAI-compatible, Ollama, Automatic1111 (image), ComfyUI (image). | OpenAI-compatible |
+| Protocol | Wire format: OpenAI-compatible, Ollama, Automatic1111 (image), ComfyUI (image), Apple Intelligence (on-device), Anthropic (Claude API). | OpenAI-compatible |
 | Capabilities | `chat`, `embedding`, `vision`, `image` — what the endpoint can do. | `chat` (presets set more) |
 | Enabled | Disabled endpoints are never handed to a plugin. | on |
 | API token | Stored in the Obsidian keychain, never in `data.json`. | none |
@@ -93,9 +94,10 @@ Other plugins reach this plugin's API at `app.plugins.plugins["llm-endpoint-mana
 
 The contract is vendored into `src/vendor/kit/endpoint-source.ts` (from `obsidian-kit`'s `endpoint-source` module, re-exported unchanged by `src/core/api-types.ts`) — see that file for the full `LlmEndpointManagerApi` interface (`version`, `list`, `get`, `resolve`, `materialize`, `models`, `importEndpoints`, `on`), the `ApiEndpoint`/`ResolvedEndpoint`/`ImportResult` shapes and the `ApiErrorCode` union. It also exports `LLM_ENDPOINT_MANAGER_PLUGIN_ID` (`"llm-endpoint-manager"`), the id this plugin registers itself under in `app.plugins.plugins[...]`.
 
-- `Provider` is `"openai" | "ollama" | "a1111" | "comfy"`, `Capability` is `"chat" | "embedding" | "vision" | "image"`.
+- `Provider` is `"openai" | "ollama" | "a1111" | "comfy" | "apple-shortcuts" | "anthropic"`, `EndpointTransport` is `"http" | "shortcuts" | "anthropic"`, `Capability` is `"chat" | "embedding" | "vision" | "image"`.
 - **Errors are values, not exceptions.** Every method that can fail returns `ApiError` instead of throwing — callers check `"error" in result` rather than wrapping every call in `try/catch`.
 - `list`/`get` return a snapshot for display; they never carry a token.
+- **Endpoints with another wire format are opt-in.** `list()` and `resolve()` return `http` endpoints only, unless the caller names more in `transports` (`list({ transports: ["http", "anthropic"] })`, `resolve("chat", { transports: ["http", "anthropic"] })`). A plugin that does not ask never sees the Claude endpoint, so an older plugin cannot be handed an endpoint it cannot speak to (in a test, such a plugin either crashed or sent an OpenAI-style request to Anthropic). `materialize(id)` hands out any endpoint the caller names. An Apple shortcut endpoint is never chosen by `resolve()`, with or without opt-in. An older manager ignores the `transports` field of `resolve()`.
 - `resolve(capability)` finds the first enabled, reachable endpoint offering that capability (in configured order) and returns it materialized — the fastest way for a caller that just wants "something that can do `chat`".
 - `materialize(id)` resolves one specific endpoint the caller already knows about (e.g. one the user picked explicitly).
 - `models(id)` lists the models a specific endpoint currently reports (cached until the endpoint changes or `force: true` is passed — the list does not expire on its own; `resolve()`/ `materialize()` use a separate 30 s reachability cache, so twelve plugins asking about the same server don't send twelve requests).

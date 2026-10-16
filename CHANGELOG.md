@@ -8,11 +8,14 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- New preset **Anthropic (Claude API)**: adds the Claude API as an endpoint of its own kind (protocol "Anthropic (Claude API)", chat and vision). Your Anthropic key goes into the keychain and is only ever sent to Anthropic, directly from your device; the connection check asks `GET /v1/models` with `x-api-key` and `anthropic-version`. Plugins that know about Claude (Koda now, the others with their next update) list the endpoint in their own endpoint choice; a plugin that does not never sees it, so an older plugin cannot be handed an endpoint it cannot speak to. New how-to: `docs/claude-api.md`.
+- API: `resolve(capability, { caller?, transports? })` takes the same opt-in as `list()`. Without it only `http` endpoints are chosen; `"anthropic"` has to be named, and an Apple shortcut endpoint is still never chosen by `resolve()`. An older caller that does not send the field gets the old behavior.
 - Settings, keychain section: tokens in the keychain that belong to no endpoint (left over after an endpoint was removed while the plugin was off, or after a reset of the settings file) are counted, and a "Clean up" button removes them after a confirmation. Nothing is removed automatically, because another device with a settings file that has not synced yet may still need them.
 
 ### Changed
 
-- Kit pins raised to `obsidian-kit` 0.61.0 and `code-kit` 0.28.0 (from 0.60.1 and 0.27.1). Of the skipped releases (obsidian-kit 0.60.2, 0.60.3, 0.61.0; code-kit 0.27.2, 0.28.0) two things reach this plugin visibly: the family list of a model row now includes "Claude", and the backend row now knows "Anthropic" (both come from the sampling table, which gained the Claude family and the Anthropic backend). Everything else is internal: the Gemma 4 thinking channel and the streaming answer area are not used here, the keychain adapter without typed access (`secret-store-loose`) is not vendored, and the endpoint list, status texts and the settings walker behave as before.
+- Settings, endpoint list: the row of preset buttons wraps onto a second line instead of being cut off at the right edge (it had six buttons with the Claude preset, and the last one, "Check connections", was already clipped in a 1000 px window).
+- Kit pins raised to `obsidian-kit` 0.62.0 and `code-kit` 0.28.1 (from 0.60.1 and 0.27.1). Of the skipped releases (obsidian-kit 0.60.2, 0.60.3, 0.61.0, 0.61.1; code-kit 0.27.2, 0.28.0) the visible effects are the Claude family in the family list of a model row and "Anthropic" in the backend row (new sampling table entries). Everything else is internal: the Gemma 4 thinking channel and the streaming answer area are not used here, the keychain adapter without typed access (`secret-store-loose`) is not vendored, and the endpoint list, status texts and the settings walker behave as before.
 
 ## [0.8.0] — 2026-10-14
 

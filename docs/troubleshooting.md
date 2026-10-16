@@ -101,3 +101,20 @@ On a phone, `localhost` is the phone itself. Use your computer's network address
 ## Getting help
 
 Open an issue on GitHub: <https://github.com/johannes-kaindl/llm-endpoint-manager/issues>. Include your Obsidian version, the exact message and the protocol of the endpoint — never your token.
+
+## The Claude API (Anthropic) endpoint
+
+See [Use the Claude API](claude-api.md) for the setup.
+
+### "Access denied — API key missing or invalid."
+
+**Cause:** Anthropic rejected the key (it is missing, mistyped, revoked, or from another organization).
+
+**What to do:** Click the key icon on the row, paste the key again from the Anthropic Console and click **Check connections**. The key is checked with a read-only request for the model list; no model is run and nothing is billed.
+
+### The Claude endpoint is green, but a plugin does not offer it
+
+**Cause:** The plugin does not know about Claude yet. A plugin asks the manager for Claude explicitly; one that does not never sees the endpoint.
+
+**What to do:** Update the plugin. Koda can use the endpoint already; the other plugins follow with their next update.
+

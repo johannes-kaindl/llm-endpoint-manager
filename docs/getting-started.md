@@ -10,7 +10,7 @@ The plugin adds no command and no ribbon icon. Everything is in its settings tab
 
 ## 2. Add your first endpoint
 
-Open **Settings → LLM Endpoint Manager**. Under **Endpoints** you see the **LLM endpoints** list and, below it, three preset buttons: **LM Studio**, **Ollama** and **OpenAI-compatible cloud**.
+Open **Settings → LLM Endpoint Manager**. Under **Endpoints** you see the **LLM endpoints** list and, below it, preset buttons: **LM Studio**, **Ollama**, **OpenAI-compatible cloud**, **Apple Intelligence (on-device)** and **Anthropic (Claude API)**.
 
 Click **LM Studio** (or **Ollama**, if that is what you run). A row appears with the address `http://localhost:1234` (Ollama: `http://localhost:11434`), the protocol and the capabilities the preset sets.
 

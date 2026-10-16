@@ -65,6 +65,9 @@ const PUNKTE = [
   "G1 Preset Apple Intelligence (on-device) → Zeile mit transport=shortcuts, Kurzbefehl-Name, KEIN HTTP-Ziel, Modellzeile apple-fm (displayFamily) und Modellblock aus Kit-Daten",
   "G2 Filter-Default: list() ohne transports-Opt-in zeigt apple-shortcuts NICHT, list({transports:[\"shortcuts\"]}) UND resolve() bleibt bei http; der Opt-in-Eintrag traegt displayFamily apple-fm",
   "H1 Verwaiste Schlüsselbund-Einträge: Zeile mit Zahl und Knopf „Clean up“, Bestätigung, danach Eintrag gelöscht und Zeile weg",
+  "I1 Preset Anthropic (Claude API) → Zeile mit provider/transport/backend anthropic, chat+vision, Hinweis zum Schlüssel sichtbar; die Knopfreihe der Vorlagen bricht um und liegt ganz im Fenster",
+  "I2 Claude-Endpunkt gegen den Anthropic-Stub: Schlüssel setzen → Status grün, Modelle aus /v1/models, Stub sah x-api-key und anthropic-version; list()/resolve() ohne Opt-in zeigen ihn nie, mit Opt-in ja",
+  "I3 Ungültiger Schlüssel → Status rot mit dem Text „Access denied — API key missing or invalid.“ (EN) bzw. dem deutschen Gegenstück",
 ] as const;
 const { record, abschluss } = createBilanz({ punkte: PUNKTE });
 
@@ -205,6 +208,7 @@ async function main(): Promise<void> {
 
   let fake: FakeServer | null = null;
   let fakeLm: FakeServer | null = null;
+  let claudeStub: LlmStub | null = null;
   let settings: SettingsStelle | null = null;
   const warnungen: string[] = [];
   // Zwei Zustandssorten ueberleben einen Ctrl-C mitten im Lauf, das `finally` unten nie: der
@@ -664,6 +668,119 @@ async function main(): Promise<void> {
       before !== null && before.visible && ["Clean up", "Aufräumen"].includes(before.button) && cleanClicked && stillThere && confirmClicked && gone !== null && after === null,
       JSON.stringify({ before, cleanClicked, stillThere, confirmClicked, gone: gone !== null, after }),
     );
+
+    // --- I1-I3: Claude API (Welle 23) -----------------------------------------------------
+    // Der LLM-Stub der Brücke im Anthropic-Modus stellt die Messages-API nach (strenge Pfade, Kopfzeilen, Schlüssel). Kein echter
+    // Aufruf an api.anthropic.com: Kosten und Schlüssel (Auftrag Welle 23).
+    console.log("\nI · Claude API");
+    await cdp.evaluate(`
+      const p = app.plugins.plugins[${q(PLUGIN_ID)}];
+      for (const e of p.settings.endpoints) if (e.secretId) app.secretStorage.setSecret(e.secretId, "");
+      p.settings.endpoints = [];
+      await p.saveSettings();
+      return true;
+    `);
+    settings = await reopenSettings(cdp, port, settings);
+    const claudePresetOk = await clickReal(settings.cdp, settings.el(
+      `Array.from(root.querySelectorAll("button")).find((b) => b.textContent.trim() === "Anthropic (Claude API)")`,
+    ));
+    const claudeRow = await pollUntil<{ ok: boolean }>(cdp, `
+      const p = app.plugins.plugins[${q(PLUGIN_ID)}];
+      return p.settings.endpoints.some((e) => e.provider === "anthropic") ? { ok: true } : null;
+    `, 8000, 300);
+    const claudeEp = await cdp.evaluate<{ id: string; url: string; provider: string; transport: string; backend: string; caps: string[] } | null>(`
+      const e = app.plugins.plugins[${q(PLUGIN_ID)}].settings.endpoints.find((x) => x.provider === "anthropic");
+      return e ? { id: e.id, url: e.url, provider: e.provider, transport: e.transport, backend: e.backend, caps: [...e.capabilities].sort() } : null;
+    `);
+    activeSecretId = claudeEp ? `${PLUGIN_ID}-${claudeEp.id}` : activeSecretId;
+    const claudeNote = await pollUntil<{ t: string }>(settings.cdp, `
+      const n = ${settings.el(`Array.from(root.querySelectorAll(".lem-row-note")).map((x) => x.textContent).find((t) => /Anthropic API key|Anthropic-API-Schlüssel/.test(t))`)};
+      return n ? { t: n } : null;
+    `, 8000, 300);
+    // Die Knopfreihe der Vorlagen bricht um und liegt ganz im Fenster (sechs Knöpfe; vorher war der letzte abgeschnitten).
+    const presetRow = await settings.cdp.evaluate<{ wrap: string; inside: boolean; buttons: number }>(`
+      const ctl = ${settings.el(`root.querySelector(".lem-presets .setting-item-control")`)};
+      if (!ctl) return { wrap: "(keine Reihe)", inside: false, buttons: 0 };
+      const box = ctl.getBoundingClientRect();
+      const btns = Array.from(ctl.querySelectorAll("button"));
+      return { wrap: getComputedStyle(ctl).flexWrap, inside: btns.every((b) => { const r = b.getBoundingClientRect(); return r.right <= box.right + 1 && r.left >= box.left - 1; }), buttons: btns.length };
+    `);
+    record(
+      "I1 Preset Anthropic (Claude API) → Zeile mit provider/transport/backend anthropic, chat+vision, Hinweis zum Schlüssel sichtbar; die Knopfreihe der Vorlagen bricht um und liegt ganz im Fenster",
+      claudePresetOk && claudeRow !== null && claudeEp?.url === "https://api.anthropic.com" && claudeEp.provider === "anthropic" && claudeEp.transport === "anthropic"
+        && claudeEp.backend === "anthropic" && JSON.stringify(claudeEp.caps) === JSON.stringify(["chat", "vision"]) && claudeNote !== null
+        && presetRow.wrap === "wrap" && presetRow.inside && presetRow.buttons === 6,
+      `Klick=${claudePresetOk}, Zeile=${JSON.stringify(claudeEp)}, Hinweis=${claudeNote !== null}, Knopfreihe=${JSON.stringify(presetRow)}`,
+    );
+    if (!claudeEp) throw new Error("I1 fehlgeschlagen — ohne Claude-Zeile sind I2/I3 gegenstandslos.");
+
+    claudeStub = await startLlmStub({ anbieter: "anthropic", schluessel: "sk-ant-smoke", models: ["claude-haiku-5-5", "claude-sonnet-5-5"] });
+    // Die Zeile zeigt auf den Stub (die Vorlage trägt den echten Host, der hier nie angefragt wird), Token über die Oberfläche.
+    await cdp.evaluate(`
+      const p = app.plugins.plugins[${q(PLUGIN_ID)}];
+      const e = p.settings.endpoints.find((x) => x.id === ${q(claudeEp.id)});
+      e.url = ${q(claudeStub.url)};
+      await p.saveSettings();
+      return true;
+    `);
+    settings = await reopenSettings(cdp, port, settings);
+    const claudeTyped = await settings.cdp.evaluate<{ ok: boolean }>(`
+      const pw = ${settings.el(`root.querySelector(".okit-ep-row input[type=password]")`)};
+      if (!pw) return { ok: false };
+      pw.focus();
+      pw.value = "sk-ant-smoke";
+      pw.dispatchEvent(new Event("input", { bubbles: true }));
+      pw.dispatchEvent(new Event("blur", { bubbles: true }));
+      return { ok: true };
+    `);
+    await pollUntil<{ ok: boolean }>(cdp, `
+      const e = app.plugins.plugins[${q(PLUGIN_ID)}].settings.endpoints.find((x) => x.id === ${q(claudeEp.id)});
+      return e && e.secretId ? { ok: true } : null;
+    `, 8000, 300);
+    settings = await reopenSettings(cdp, port, settings);
+    const statusOk = await pollUntil<{ cls: string }>(settings.cdp, `
+      const el = ${settings.el(`root.querySelector(".okit-ep-row .okit-ep-status")`)};
+      return el && (el.classList.contains("is-ok") || el.classList.contains("is-error")) ? { cls: el.classList.contains("is-ok") ? "is-ok" : "is-error" } : null;
+    `, 10000, 300);
+    const claudeApi = await cdp.evaluate<{ defaultIds: string[]; optIn: Array<{ id: string; provider: string; transport: string; backend: string }>; resolveDefault: string | null; resolveOptIn: string | null; models: unknown }>(`
+      const api = app.plugins.plugins[${q(PLUGIN_ID)}].api;
+      const rd = await api.resolve("chat");
+      const ro = await api.resolve("chat", { transports: ["http", "anthropic"] });
+      return {
+        defaultIds: api.list({ capability: "chat" }).map((e) => e.id),
+        optIn: api.list({ capability: "chat", transports: ["http", "anthropic"] }).map((e) => ({ id: e.id, provider: e.provider, transport: e.transport, backend: e.backend })),
+        resolveDefault: rd && rd.id ? rd.id : (rd && rd.error) ?? null,
+        resolveOptIn: ro && ro.id ? ro.id : (ro && ro.error) ?? null,
+        models: await api.models(${q(claudeEp.id)}, { force: true }),
+      };
+    `);
+    const modelsReq = claudeStub.letzte("models");
+    const claudeKopf = modelsReq ? { key: modelsReq.header["x-api-key"], version: modelsReq.header["anthropic-version"], auth: modelsReq.header["authorization"] ?? null } : null;
+    record(
+      "I2 Claude-Endpunkt gegen den Anthropic-Stub: Schlüssel setzen → Status grün, Modelle aus /v1/models, Stub sah x-api-key und anthropic-version; list()/resolve() ohne Opt-in zeigen ihn nie, mit Opt-in ja",
+      claudeTyped.ok && statusOk?.cls === "is-ok" && JSON.stringify(claudeApi.models) === JSON.stringify(["claude-haiku-5-5", "claude-sonnet-5-5"])
+        && claudeKopf?.key === "sk-ant-smoke" && claudeKopf.version === "2023-06-01" && claudeKopf.auth === null
+        && claudeApi.defaultIds.length === 0 && claudeApi.optIn.length === 1 && claudeApi.optIn[0]?.provider === "anthropic" && claudeApi.optIn[0].transport === "anthropic" && claudeApi.optIn[0].backend === "anthropic"
+        && claudeApi.resolveDefault === "no-endpoint" && claudeApi.resolveOptIn === claudeEp.id,
+      JSON.stringify({ status: statusOk?.cls, kopf: claudeKopf, api: claudeApi }),
+    );
+
+    // I3 — falscher Schlüssel: der Stub antwortet 401 authentication_error, die Zeile sagt es in Worten.
+    await cdp.evaluate(`
+      app.secretStorage.setSecret(${q(`${PLUGIN_ID}-${claudeEp.id}`)}, "falsch");
+      app.plugins.plugins[${q(PLUGIN_ID)}].handle.invalidateUrl(${q(claudeStub.url)});
+      return true;
+    `);
+    settings = await reopenSettings(cdp, port, settings);
+    const statusBad = await pollUntil<{ cls: string; tip: string }>(settings.cdp, `
+      const el = ${settings.el(`root.querySelector(".okit-ep-row .okit-ep-status")`)};
+      return el && el.classList.contains("is-error") ? { cls: "is-error", tip: el.getAttribute("aria-label") || "" } : null;
+    `, 10000, 300);
+    record(
+      "I3 Ungültiger Schlüssel → Status rot mit dem Text „Access denied — API key missing or invalid.“ (EN) bzw. dem deutschen Gegenstück",
+      statusBad !== null && ["Access denied — API key missing or invalid.", "Zugriff verweigert — Schlüssel fehlt oder ist ungültig."].includes(statusBad.tip),
+      JSON.stringify(statusBad),
+    );
   } finally {
     // B haengt seinen Fake-Endpunkt am Ende NICHT selbst aus — ohne diesen Schritt hinterlaesst
     // schon ein regulaer DURCHGELAUFENER Lauf einen Rest in settings.endpoints, den C2 des
@@ -673,6 +790,7 @@ async function main(): Promise<void> {
     if (settings) closeSettings(cdp, settings);
     if (fake) await fake.close().catch(() => undefined);
     if (fakeLm) await fakeLm.close().catch(() => undefined);
+    if (claudeStub) await claudeStub.stop().catch(() => undefined);
     cdp.close();
     // Auch nach einem Abbruch: Punkte, die nie aufgezeichnet wurden, zaehlen als „nichts gemessen“.
     abschluss();

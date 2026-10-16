@@ -20,9 +20,10 @@ Sprechen mehrere Plugins in deinem Vault mit Sprachmodellen, fragt normalerweise
 - **Erreichbarkeit live** — jede Zeile zeigt einen Status-Indikator und beim Darüberfahren den Grund (Verbindung abgelehnt, Host nicht gefunden, Zeitüberschreitung, „antwortet, aber nicht wie eine Modell-API", Token abgelehnt). „Verbindungen prüfen“ testet alle Zeilen neu. Eine erreichbare Zeile mit Modell zeigt außerdem die Kontextlänge des Modells („Kontext: geladen N · max M Token“), wenn der Server sie nennt.
 - **Modelltabelle** — je Endpunkt jedes Modell, das der Server meldet, plus die bereits konfigurierten. Setze die **Familie** eines Modells (aus dem Namen wird ein Vorschlag gemacht) und markiere es als **andere Schreibweise** einer zweiten Modell-ID, damit Plugins die ID senden, die du willst.
 - **Backend-Erkennung** — „Erkennen“ erkennt LM Studio, Ollama, Open WebUI oder einen schlichten OpenAI-kompatiblen Server mit rein lesenden Anfragen; es lädt nie ein Modell.
+- **Claude API (Anthropic)** — ein Preset legt die Claude API als eigenen Endpunkt-Typ an. Dein Anthropic-Schlüssel kommt in den Schlüsselbund, die Anfrage geht direkt von deinem Gerät an Anthropic (die native Messages-API, Antwort im Strom, Denken als Zusammenfassung). Plugins, die Claude kennen, nehmen sie von selbst; Koda kann sie schon nutzen, die übrigen folgen mit ihrem nächsten Update. Siehe [Use the Claude API](https://github.com/johannes-kaindl/llm-endpoint-manager/blob/main/docs/claude-api.md).
 - **Sehen, wer ihn nutzt** — der Einstellungs-Tab listet, welche Plugins in dieser Sitzung nach einem Endpunkt gefragt haben und für welche Fähigkeit.
 
-<img src="https://raw.githubusercontent.com/johannes-kaindl/llm-endpoint-manager/main/docs/images/endpoints.png" width="820" alt="Die untere Endpunkt-Liste: eine Ollama-Zeile, erreichbar auf Platz 2, eine Zeile Office server mit rotem Indikator, gespeichertem Token und dem Vermerk nicht erreichbar, darunter Hinzufüge-Feld und Preset-Knöpfe LM Studio, Ollama, OpenAI-compatible cloud und Check connections">
+<img src="https://raw.githubusercontent.com/johannes-kaindl/llm-endpoint-manager/main/docs/images/endpoints.png" width="820" alt="Die untere Endpunkt-Liste: eine Ollama-Zeile, erreichbar auf Platz 2, eine Zeile Office server mit rotem Indikator, gespeichertem Token und dem Vermerk nicht erreichbar, darunter Hinzufüge-Feld und Preset-Knöpfe LM Studio, Ollama, OpenAI-compatible cloud, Apple Intelligence und Anthropic (Claude API), auf zwei Zeilen umgebrochen, und Check connections">
 
 <img src="https://raw.githubusercontent.com/johannes-kaindl/llm-endpoint-manager/main/docs/images/models.png" width="820" alt="Die Gruppe Models für einen LM-Studio-Endpunkt: vier Modelle mit Familien-Auswahl, ein Familien-Vorschlag, ein Modell als andere Schreibweise von qwen/qwen3.8-27b und die Backend-Zeile LM Studio mit Detect-Knopf">
 
@@ -56,7 +57,7 @@ cd llm-endpoint-manager && npm install && npm run build
 
 Das Plugin hat weder Befehle noch ein Ribbon-Icon; alles passiert unter **Einstellungen → LLM Endpoint Manager**.
 
-1. Unter **Endpunkte** eine Adresse in das Feld **Endpunkt hinzufügen: http://localhost:1234** tippen und aus dem Feld herausklicken (Zeilen werden gespeichert, sobald ein Feld den Fokus verliert) — oder einen Preset-Knopf klicken (**LM Studio**, **Ollama**, **OpenAI-compatible cloud**).
+1. Unter **Endpunkte** eine Adresse in das Feld **Endpunkt hinzufügen: http://localhost:1234** tippen und aus dem Feld herausklicken (Zeilen werden gespeichert, sobald ein Feld den Fokus verliert) — oder einen Preset-Knopf klicken (**LM Studio**, **Ollama**, **OpenAI-compatible cloud**, **Apple Intelligence (auf dem Gerät)**, **Anthropic (Claude API)**).
 2. **Protokoll** und **Fähigkeiten** der Zeile prüfen. Eine Zeile ohne Fähigkeit ist für jedes Plugin unsichtbar und zeigt eine Warnung.
 3. Optional: ein **API-Token (optional)** in die Zeile einfügen. Es geht in den Schlüsselbund; die Zeile zeigt dann **Token gespeichert**.
 4. Den Status-Indikator lesen: **erreichbar, Platz 1** heißt, das ist die erste Wahl für ein Plugin (bei der Fähigkeit, die es anfragt); **erreichbar, Platz 2** heißt, ein besserer steht davor. Mit **Zuerst verwenden** änderst du die Reihenfolge.
@@ -68,7 +69,7 @@ Das Plugin hat weder Befehle noch ein Ribbon-Icon; alles passiert unter **Einste
 |---|---|---|
 | Adresse | Basis-URL des Servers. Ein abschließendes `/v1` wird automatisch entfernt. | — |
 | Bezeichnung | Name in diesem Tab und für andere Plugins. | aus der Adresse abgeleitet |
-| Protokoll | Wire-Format: OpenAI-kompatibel, Ollama, Automatic1111 (Bild), ComfyUI (Bild). | OpenAI-kompatibel |
+| Protokoll | Wire-Format: OpenAI-kompatibel, Ollama, Automatic1111 (Bild), ComfyUI (Bild), Apple Intelligence (auf dem Gerät), Anthropic (Claude API). | OpenAI-kompatibel |
 | Fähigkeiten | `chat`, `embedding`, `vision`, `image` — wozu der Endpunkt taugt. | `chat` (Presets setzen mehr) |
 | Aktiv | Deaktivierte Endpunkte bekommt nie ein Plugin. | an |
 | API-Token | Im Obsidian-Schlüsselbund, nie in `data.json`. | keins |
