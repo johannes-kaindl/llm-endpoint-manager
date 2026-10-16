@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-10-16
+
 ### Added
 
 - New preset **Anthropic (Claude API)**: adds the Claude API as an endpoint of its own kind (protocol "Anthropic (Claude API)", chat and vision). Your Anthropic key goes into the keychain and is only ever sent to Anthropic, directly from your device; the connection check asks `GET /v1/models` with `x-api-key` and `anthropic-version`. Plugins that know about Claude (lingotuner now, the others with their next update) list the endpoint in their own endpoint choice; a plugin that does not never sees it, so an older plugin cannot be handed an endpoint it cannot speak to. New how-to: `docs/claude-api.md`.
