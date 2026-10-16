@@ -256,10 +256,10 @@ describe("LlmEndpointManagerSettingTab", () => {
   it("Tooltip der Anthropic-Vorlage trägt den einen Satz zu den Plugins (EN/DE); andere Vorlagen bleiben bei „hinzufügen“", async () => {
     await tab({});
     setLang("en");
-    expect(presetTooltip({ label: "Anthropic (Claude API)" })).toBe("Add Anthropic (Claude API) Claude with your own Anthropic key. Koda can use it already; the other plugins follow with their next update.");
+    expect(presetTooltip({ label: "Anthropic (Claude API)" })).toBe("Add Anthropic (Claude API) Claude with your own Anthropic key. lingotuner can use it already; the other plugins follow with their next update.");
     expect(presetTooltip({ label: "LM Studio" })).toBe("Add LM Studio");
     setLang("de");
-    try { expect(presetTooltip({ label: "Anthropic (Claude API)" })).toContain("Koda kann sie schon nutzen"); }
+    try { expect(presetTooltip({ label: "Anthropic (Claude API)" })).toContain("lingotuner kann sie schon nutzen"); }
     finally { setLang("en"); }
   });
   it("eine Claude-Zeile zeigt den Hinweis zum Schlüssel; die Protokoll-Auswahl kennt Anthropic, ein Wechsel zurück nimmt Transport und Backend weg", async () => {

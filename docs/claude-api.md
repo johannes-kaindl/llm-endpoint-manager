@@ -16,7 +16,7 @@ Hover the status indicator on the row, or click **Check connections**. A green i
 
 ## 4. Which plugins use it
 
-A plugin that supports Claude lists the endpoint in its own endpoint choice and sends its requests to Anthropic's native API. **Koda can use it already; the other plugins follow with their next update.** A plugin that does not know about Claude never sees the endpoint, so adding it cannot break an older plugin.
+A plugin that supports Claude lists the endpoint in its own endpoint choice and sends its requests to Anthropic's native API. **lingotuner can use it already; the other plugins follow with their next update.** A plugin that does not know about Claude never sees the endpoint, so adding it cannot break an older plugin.
 
 ## What to expect
 

@@ -116,5 +116,5 @@ See [Use the Claude API](claude-api.md) for the setup.
 
 **Cause:** The plugin does not know about Claude yet. A plugin asks the manager for Claude explicitly; one that does not never sees the endpoint.
 
-**What to do:** Update the plugin. Koda can use the endpoint already; the other plugins follow with their next update.
+**What to do:** Update the plugin. lingotuner can use the endpoint already; the other plugins follow with their next update.
 
