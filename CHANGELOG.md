@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.9.1] — 2026-10-22
+
 ### Changed
 
 - Docs: Koda (koda-agent 0.28.0) can use the Claude API endpoint as well, not only lingotuner (README, Claude API guide, troubleshooting).
