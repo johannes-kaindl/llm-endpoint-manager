@@ -36,7 +36,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { cwd } from "node:process";
 
-import { Cdp, attachTo, beimAbbruch, bereiteInstanzVor, clickReal, istAbgebrochen, pollUntil, requireVisible } from "../../tools/obsidian-cdp/cdp.js";
+import { Cdp, attachTo, beimAbbruch, bereiteInstanzVor, clickReal, istAbgebrochen, pollUntil, requireVisible, schliesseEinstellungen } from "../../tools/obsidian-cdp/cdp.js";
 import { startLlmStub, type LlmStub } from "../../tools/obsidian-cdp/llm-stub.js";
 import { createBilanz, parseArgs, runDriver } from "../../tools/obsidian-cdp/bilanz.js";
 import { buildVault, requireEigenerBuild, stagingVaultDir } from "../../tools/obsidian-cdp/vault.js";
@@ -143,7 +143,7 @@ async function openSettings(cdp: Cdp, port: number): Promise<SettingsStelle> {
 
 function closeSettings(cdp: Cdp, stelle: SettingsStelle): void {
   if (stelle.eigenesFenster) stelle.cdp.close();
-  else void cdp.evaluate(`app.setting.close(); return true;`).catch(() => undefined);
+  else void schliesseEinstellungen(cdp);
 }
 
 /** Settings-Ansicht neu aufbauen (nach einer Mutation, damit ein Re-Render sicher gesehen
