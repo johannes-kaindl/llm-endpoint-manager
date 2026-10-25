@@ -117,3 +117,8 @@ tests/vendor/kit/     vendorter Obsidian-Mock (obsidian-mock.ts)
 ## Abweichungen von der Leitkonvention
 
 Keine bekannt (Stand 2026-09-15, Release 0.1.0/0.1.1).
+
+## UI-Abweichungen
+
+- **model-bar** — Grund: Das Modell-Dropdown liegt im Einstellungs-Tab des Managers (Modell-Zeilen je Endpunkt, `src/obsidian/settings-tab.ts`), nicht in einer Chat- oder LLM-Ansicht; die Kit-Modellzeile (`buildModelBar`) ist der Baustein für Ansichten, die Anfragen an ein Modell schicken, und der Manager besitzt keine (Zuständigkeit: nur Endpunkte, Modell-Listen und Beschreibung, keine Anfragen). Gemessen 2026-10-23 als Fehlalarm von `tools/ui_adoption_check.py`, deklariert 2026-10-25 (Welle 27)
+  — gilt-solange: `src/obsidian/settings-tab.ts` enthaelt-nicht `buildModelBar`
