@@ -32,7 +32,7 @@ Sprechen mehrere Plugins in deinem Vault mit Sprachmodellen, fragt normalerweise
 ## Voraussetzungen
 
 - **Obsidian 1.11.4+** (Desktop und Mobile). Der Schlüsselbund braucht diese Version; ältere können keine Tokens speichern.
-- **Ein erreichbarer Modell-Server** — etwa [LM Studio](https://lmstudio.ai) oder [Ollama](https://ollama.com) auf deinem Rechner, oder eine gehostete OpenAI-kompatible API, wenn du ihr Token einträgst. Neu bei lokalen LLMs? Der **[Setup-Guide für lokale LLMs](https://uplink.jkaindl.de/llm-setup)** deckt Server-Setup, die Endpunkt-Adresse samt `/v1`-Frage und den Zugriff vom Handy ab.
+- **Ein erreichbarer Modell-Server** — etwa [LM Studio](https://lmstudio.ai) oder [Ollama](https://ollama.com) auf deinem Rechner, oder eine gehostete OpenAI-kompatible API, wenn du ihr Token einträgst. Neu bei lokalen LLMs? Der **[Setup-Guide für lokale LLMs](https://jkaindl.de/uplink/llm-setup/)** deckt Server-Setup, die Endpunkt-Adresse samt `/v1`-Frage und den Zugriff vom Handy ab.
 - **Mindestens ein Plugin, das die API nutzt.** Der Manager läuft für sich, speichert und prüft aber nur Endpunkte — mehr tut er nicht, bis ein anderes Plugin einen anfragt.
 
 ## Installation

@@ -18,7 +18,7 @@ Each entry gives the message as it appears in the settings tab (English interfac
 
 ### "Responds, but is not an OpenAI-compatible endpoint — wrong path/service?"
 
-**Cause:** something answers, but not with a model list at the expected path (any answer other than a model list, and other than 401/403, lands here). Typical: the address points at a web page, a reverse proxy without the API path, or carries a path beyond the base (for example `…/v1/chat/completions`). **What to do:** enter the base address only — `http://host:1234`. A trailing `/v1` is fine, the plugin strips it; anything deeper is not stripped. For image protocols check that the row's **Protocol** matches the server (**Automatic1111 (image)**, **ComfyUI (image)**). The [local LLM setup guide](https://uplink.jkaindl.de/llm-setup) explains the right address per server.
+**Cause:** something answers, but not with a model list at the expected path (any answer other than a model list, and other than 401/403, lands here). Typical: the address points at a web page, a reverse proxy without the API path, or carries a path beyond the base (for example `…/v1/chat/completions`). **What to do:** enter the base address only — `http://host:1234`. A trailing `/v1` is fine, the plugin strips it; anything deeper is not stripped. For image protocols check that the row's **Protocol** matches the server (**Automatic1111 (image)**, **ComfyUI (image)**). The [local LLM setup guide](https://jkaindl.de/uplink/llm-setup/) explains the right address per server.
 
 ### "Access denied — API key missing or invalid."
 
@@ -96,7 +96,7 @@ The settings could not be written (disk full or file locked). The list shows wha
 
 ### `localhost` does not work on my phone
 
-On a phone, `localhost` is the phone itself. Use your computer's network address or a name that resolves on your network, and make sure the server listens on it — the [local LLM setup guide](https://uplink.jkaindl.de/llm-setup) covers mobile access.
+On a phone, `localhost` is the phone itself. Use your computer's network address or a name that resolves on your network, and make sure the server listens on it — the [local LLM setup guide](https://jkaindl.de/uplink/llm-setup/) covers mobile access.
 
 ## Getting help
 

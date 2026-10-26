@@ -1,6 +1,6 @@
 # Getting started
 
-This walk-through takes you from installing LLM Endpoint Manager to a first endpoint that shows **Connected**, with a token stored in the keychain. It takes about five minutes and needs a model server you can reach — for example [LM Studio](https://lmstudio.ai) on the same machine (the [local LLM setup guide](https://uplink.jkaindl.de/llm-setup) covers installing one).
+This walk-through takes you from installing LLM Endpoint Manager to a first endpoint that shows **Connected**, with a token stored in the keychain. It takes about five minutes and needs a model server you can reach — for example [LM Studio](https://lmstudio.ai) on the same machine (the [local LLM setup guide](https://jkaindl.de/uplink/llm-setup/) covers installing one).
 
 ## 1. Install and enable
 

@@ -32,7 +32,7 @@ If several plugins in your vault talk to language models, each one normally asks
 ## Requirements
 
 - **Obsidian 1.11.4+** (desktop and mobile). The keychain needs this version; older versions cannot store tokens.
-- **A model server you can reach** — for example [LM Studio](https://lmstudio.ai) or [Ollama](https://ollama.com) on your own machine, or a hosted OpenAI-compatible API if you add its token. New to local LLMs? The **[local LLM setup guide](https://uplink.jkaindl.de/llm-setup)** covers server setup, the endpoint address including the `/v1` question, and access from a phone.
+- **A model server you can reach** — for example [LM Studio](https://lmstudio.ai) or [Ollama](https://ollama.com) on your own machine, or a hosted OpenAI-compatible API if you add its token. New to local LLMs? The **[local LLM setup guide](https://jkaindl.de/uplink/llm-setup/)** covers server setup, the endpoint address including the `/v1` question, and access from a phone.
 - **At least one plugin that uses the API.** The manager works on its own, but it only stores and checks endpoints — it does nothing else until another plugin asks it for one.
 
 ## Install

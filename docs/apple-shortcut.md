@@ -2,7 +2,7 @@
 
 This how-to gets the **Apple Intelligence (on-device)** endpoint working: chat through Apple's on-device model, run from the Shortcuts app, with no server and no network. It needs iOS or macOS 26 or newer, with Apple Intelligence enabled on the device.
 
-For the full picture — why this exists, its limits, and the shortcut itself — see the central guide [uplink.jkaindl.de/apple-shortcuts](https://uplink.jkaindl.de/apple-shortcuts). This page only covers the plugin-side setting.
+For the full picture — why this exists, its limits, and the shortcut itself — see the central guide [jkaindl.de/uplink/apple-shortcuts](https://jkaindl.de/uplink/apple-shortcuts/). This page only covers the plugin-side setting.
 
 ## 1. Get the shortcut
 
