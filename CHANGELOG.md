@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.9.3] — 2026-11-09
+
 ### Changed
 
 - Settings, endpoint list: switching a row's **Protocol** to **Automatic1111 (image)** or **ComfyUI (image)** now switches on the capability **image**. If the capabilities still match a preset's defaults (for example chat, vision and embedding from the LM Studio preset), they are replaced by **image** alone, so a plugin asking for a chat endpoint is not handed an image server. If you set the capabilities yourself (any other combination), they stay as they are and **image** is only added. Other protocols leave the capabilities alone, and switching back from an image protocol does not undo the change.
