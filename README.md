@@ -70,7 +70,7 @@ The plugin has no commands and no ribbon icon; everything happens in **Settings 
 | Address | Base URL of the server. A trailing `/v1` is stripped automatically. | — |
 | Label | Name shown in this tab and to other plugins. | derived from the address |
 | Protocol | Wire format: OpenAI-compatible, Ollama, Automatic1111 (image), ComfyUI (image), Apple Intelligence (on-device), Anthropic (Claude API). | OpenAI-compatible |
-| Capabilities | `chat`, `embedding`, `vision`, `image` — what the endpoint can do. | `chat` (presets set more) |
+| Capabilities | `chat`, `embedding`, `vision`, `image` — what the endpoint can do. | `chat` (presets set more; switching the protocol to Automatic1111 or ComfyUI sets `image`) |
 | Enabled | Disabled endpoints are never handed to a plugin. | on |
 | API token | Stored in the Obsidian keychain, never in `data.json`. | none |
 | Default model | Hint that plugins may use; each plugin decides for itself. | empty |

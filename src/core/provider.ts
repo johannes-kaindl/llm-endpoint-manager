@@ -72,3 +72,20 @@ export const PRESETS: readonly ProviderPreset[] = [
     transport: "anthropic", backend: "anthropic",
   },
 ];
+
+const IMAGE_PROVIDERS: readonly Provider[] = ["a1111", "comfy"];
+
+function sameSet(a: readonly Capability[], b: readonly Capability[]): boolean {
+  return a.length === b.length && a.every((c) => b.includes(c));
+}
+
+/** Fähigkeiten nach einem Protokollwechsel. Wechselt eine Zeile auf ein Bild-Protokoll (a1111, comfy), wird `image` vorbelegt:
+ *  steht die Liste noch genau auf der Vorgabe eines Presets (LM Studio, Ollama, Cloud …) oder ist leer, hat der Nutzer sie nie
+ *  angefasst, und sie wird zu `["image"]` — sonst bekäme `resolve("chat")` einen Bild-Server. Eine bewusst angepasste Liste bleibt, `image`
+ *  kommt nur dazu. Jedes andere Protokoll lässt die Liste unberührt. Gibt eine neue Liste zurück. */
+export function capabilitiesForProvider(caps: readonly Capability[], provider: Provider): Capability[] {
+  if (!IMAGE_PROVIDERS.includes(provider)) return [...caps];
+  if (caps.includes("image")) return [...caps];
+  if (caps.length === 0 || PRESETS.some((p) => sameSet(p.capabilities, caps))) return ["image"];
+  return [...caps, "image"];
+}

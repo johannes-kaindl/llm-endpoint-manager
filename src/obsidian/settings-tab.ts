@@ -13,7 +13,7 @@ import { BACKEND_IDS, BACKENDS, FAMILIES, FAMILY_IDS, MODEL_FAMILIES, type Backe
 import { probeBaseUrl, probeEndpoint } from "../vendor/kit/capabilities";
 import { CAPABILITIES, PROVIDERS, DEFAULT_SHORTCUT_NAME, DEFAULT_SHORTCUT_TIMEOUT_MS, labelFromUrl, newId, withProvider, type ManagedEndpoint, type Provider } from "../core/model";
 import { modelRows, setModelMeta, type ModelRow } from "../core/model-rows";
-import { PRESETS } from "../core/provider";
+import { PRESETS, capabilitiesForProvider } from "../core/provider";
 import { firstActiveUrl } from "../core/reachability";
 import { clientFor, capabilityFetch, loadModelContext } from "./http";
 import type { ModelContext } from "../vendor/kit/model-context";
@@ -272,7 +272,7 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
       // ist nach Schlüssel indiziert, muss also hier gezielt invalidiert werden. `save()` invalidiert
       // nur `handle.invalidateUrl` (API-interne Caches, s. Kommentar dort); dieser Cache ist lokal
       // im Settings-Tab und lebt in `this.modelLists`, nicht im Handle.
-      d.onChange((v) => { this.modelLists.invalidate(normalizeEndpoint(cfg.url)); void save((e) => { withProvider(e, v as Provider); }).then(() => this.refreshUi()); });
+      d.onChange((v) => { this.modelLists.invalidate(normalizeEndpoint(cfg.url)); void save((e) => { withProvider(e, v as Provider); e.capabilities = capabilitiesForProvider(e.capabilities, v as Provider); }).then(() => this.refreshUi()); });
     });
     const caps = new Setting(host).setName(t("row.capabilities"));
     // Eigene Klasse statt `:has(.lem-cap)` in styles.css (Store-Befund „Avoid :has“, 0.2.3).

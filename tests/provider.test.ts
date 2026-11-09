@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { PRESETS, providerProbe } from "../src/core/provider";
+import { PRESETS, capabilitiesForProvider, providerProbe } from "../src/core/provider";
 import { APPLE_SHORTCUTS_URL, DEFAULT_SHORTCUT_NAME, DEFAULT_SHORTCUT_TIMEOUT_MS } from "../src/core/model";
 
 describe("providerProbe", () => {
@@ -60,5 +60,33 @@ describe("providerProbe", () => {
     expect(preset?.url).toBe(APPLE_SHORTCUTS_URL);
     expect(preset?.transport).toBe("shortcuts");
     expect(preset?.shortcut).toEqual({ name: DEFAULT_SHORTCUT_NAME, timeoutMs: DEFAULT_SHORTCUT_TIMEOUT_MS });
+  });
+});
+
+describe("capabilitiesForProvider — Wechsel auf ein Bild-Protokoll", () => {
+  it("unbearbeitete Preset-Vorgaben (LM Studio, Ollama, Cloud) werden zu image ersetzt", () => {
+    expect(capabilitiesForProvider(["chat", "vision", "embedding"], "a1111")).toEqual(["image"]);
+    expect(capabilitiesForProvider(["embedding", "chat"], "comfy")).toEqual(["image"]);
+    expect(capabilitiesForProvider(["chat"], "a1111")).toEqual(["image"]);
+  });
+  it("leere Liste → image", () => {
+    expect(capabilitiesForProvider([], "a1111")).toEqual(["image"]);
+  });
+  it("bewusst angepasste Liste bleibt, image kommt dazu", () => {
+    expect(capabilitiesForProvider(["chat", "image"], "comfy")).toEqual(["chat", "image"]);
+    expect(capabilitiesForProvider(["vision"], "a1111")).toEqual(["vision", "image"]);
+  });
+  it("hat die Liste schon image, bleibt sie unverändert", () => {
+    expect(capabilitiesForProvider(["image"], "a1111")).toEqual(["image"]);
+  });
+  it("andere Protokolle lassen die Liste unberührt", () => {
+    for (const p of ["openai", "ollama", "anthropic", "apple-shortcuts"] as const) {
+      expect(capabilitiesForProvider(["chat", "vision", "embedding"], p)).toEqual(["chat", "vision", "embedding"]);
+    }
+  });
+  it("verändert die Eingabe nicht", () => {
+    const caps: ("chat" | "vision" | "embedding")[] = ["chat", "vision", "embedding"];
+    capabilitiesForProvider(caps, "a1111");
+    expect(caps).toEqual(["chat", "vision", "embedding"]);
   });
 });

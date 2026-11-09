@@ -141,6 +141,20 @@ describe("LlmEndpointManagerSettingTab", () => {
     dropdowns[0]!.onChangeCB?.("a1111");
     expect(calls).toEqual(["http://a"]);   // normalizeEndpoint("http://a")
   });
+  it("Protokollwechsel auf a1111 belegt die Fähigkeit image vor; eine bewusst gesetzte Liste bleibt", async () => {
+    const { el, plugin } = await tab({ endpoints: [
+      { id: "e1", url: "http://a", provider: "openai", capabilities: ["chat", "vision", "embedding"] },
+      { id: "e2", url: "http://b", provider: "openai", capabilities: ["vision"] },
+    ] });
+    for (const i of [0, 1]) {
+      const inExtra = settingsIn(el.querySelectorAll(".okit-ep-extra")[i]!);
+      const dropdowns = inExtra.flatMap(s => s.components.filter((c: unknown): c is DropdownComponent => c instanceof DropdownComponent));
+      dropdowns[0]!.onChangeCB?.("a1111");
+      await new Promise(r => setTimeout(r, 0));
+    }
+    expect(plugin.settings.endpoints[0]).toEqual(expect.objectContaining({ provider: "a1111", capabilities: ["image"] }));
+    expect(plugin.settings.endpoints[1]).toEqual(expect.objectContaining({ provider: "a1111", capabilities: ["vision", "image"] }));
+  });
   it("zeigt ohne Schlüsselbund den Hinweis und keinen Konsumenten-Eintrag", async () => {
     const app = makeFakeApp(); delete app.secretStorage;
     const { el } = await tab({}, app);
