@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Connection check of an **Automatic1111 (image)** row: a server that answers `GET /sdapi/v1/sd-models` with 404 (Draw Things has no model list on its API) was reported as "Responds, but is not … compatible". The check now asks `GET /sdapi/v1/options` when the first answer is 404 and shows the row as connected if that answers. A real AUTOMATIC1111 answers the first request and needs no second one; a 401, a server error or no answer is reported as before. The model list still only comes from `/sdapi/v1/sd-models`, so a Draw Things row shows no list and you type the model name.
+
 ## [0.9.1] — 2026-10-22
 
 ### Changed

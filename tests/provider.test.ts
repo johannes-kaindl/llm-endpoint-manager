@@ -16,6 +16,10 @@ describe("providerProbe", () => {
     expect(providerProbe("comfy")?.path).toBe("/system_stats");
     expect(providerProbe("comfy")?.models({ system: {} })).toEqual([]);
   });
+  it("a1111 hat einen Ausweichpfad für Server ohne Modell-Liste (Draw Things: sd-models 404, options 200)", () => {
+    expect(providerProbe("a1111")?.fallbackPath).toBe("/sdapi/v1/options");
+    for (const p of ["openai", "ollama", "comfy", "anthropic"] as const) expect(providerProbe(p)?.fallbackPath).toBeUndefined();
+  });
   it("anthropic liest /v1/models (mit limit, sonst nur 20 Modelle) und data[].id", () => {
     const pp = providerProbe("anthropic");
     expect(pp?.path).toBe("/v1/models?limit=1000");

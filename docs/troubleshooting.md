@@ -20,6 +20,12 @@ Each entry gives the message as it appears in the settings tab (English interfac
 
 **Cause:** something answers, but not with a model list at the expected path (any answer other than a model list, and other than 401/403, lands here). Typical: the address points at a web page, a reverse proxy without the API path, or carries a path beyond the base (for example `…/v1/chat/completions`). **What to do:** enter the base address only — `http://host:1234`. A trailing `/v1` is fine, the plugin strips it; anything deeper is not stripped. For image protocols check that the row's **Protocol** matches the server (**Automatic1111 (image)**, **ComfyUI (image)**). The [local LLM setup guide](https://jkaindl.de/uplink/llm-setup/) explains the right address per server.
 
+### Draw Things (or another image app) shows "not connected" although the server runs
+
+**Cause:** in 0.9.1 and older the check of an **Automatic1111 (image)** row asked only `/sdapi/v1/sd-models`; Draw Things answers that with 404 (it has no model list on its API) and was reported as "Responds, but is not … compatible". **What to do:** update the plugin (the check asks `/sdapi/v1/options` when the first answer is 404). Set the row's **Protocol** to **Automatic1111 (image)**, switch on **image** only under capabilities, and enter the base address, for example `http://127.0.0.1:7860`. Draw Things needs **API Server** switched on with protocol **HTTP** in its settings. The model name is typed by hand, because there is no list to pick from.
+
+**`0.0.0.0` as the address:** it is what a server shows as "listens on every interface", not an address to connect to. Some systems and browsers refuse it as a destination, and the plugin warns under the address (**Looks like an example or placeholder address**). Use `127.0.0.1` for a server on the same computer, or the computer's network address from another device. The plugin does not rewrite the address you typed.
+
 ### "Access denied — API key missing or invalid."
 
 **Cause:** the server answered 401 or 403 — it demands an API token and got none or a wrong one. **What to do:** paste the token into **API token (optional)** on the row (see below if the field is locked). If the row says **A token is referenced but not in the keychain — enter it again.**, the keychain entry is gone (for example on a new device) — enter the token again.

@@ -53,8 +53,8 @@ export function probeHeaders(cfg: EndpointConfig, provider: Provider): Record<st
   return { ...(cfg.apiKey ? { "x-api-key": cfg.apiKey } : {}), "anthropic-version": ANTHROPIC_VERSION };
 }
 
-function target(cfg: EndpointConfig, provider: Provider, probe: ReturnType<typeof providerProbe>): string {
-  return `${normalizeEndpoint(cfg.url)}${probe?.path ?? ""}`;
+function target(cfg: EndpointConfig, provider: Provider, probe: ReturnType<typeof providerProbe>, path: string | undefined = probe?.path): string {
+  return `${normalizeEndpoint(cfg.url)}${path ?? ""}`;
 }
 
 /** `apple-shortcuts` hat keinen HTTP-Pfad (Spec § Baustein 2): Erreichbarkeit ist ein reiner
@@ -76,7 +76,9 @@ export function applePlatformStatus(): EndpointStatus {
 export async function probeStatus(cfg: EndpointConfig, provider: Provider, timeoutMs: number = PROBE_TIMEOUT_MS): Promise<EndpointStatus> {
   if (provider === "apple-shortcuts") return applePlatformStatus();
   const probe = providerProbe(provider);
-  const res = await send(target(cfg, provider, probe), timeoutMs, probeHeaders(cfg, provider));
+  let res = await send(target(cfg, provider, probe), timeoutMs, probeHeaders(cfg, provider));
+  // Ein Server ohne die Liste (Draw Things) antwortet 404, ist aber da: dann der Ausweichpfad. Nur 404, nicht 401/5xx/Netzfehler.
+  if (res.status === 404 && probe?.fallbackPath) res = await send(target(cfg, provider, probe, probe.fallbackPath), timeoutMs, probeHeaders(cfg, provider));
   if (res.timedOut) return classifyEndpointStatus({ kind: "timeout" });
   if (res.error !== null) return classifyEndpointStatus({ kind: "error", message: res.error });
   if (provider === "a1111" || provider === "comfy") {

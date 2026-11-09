@@ -74,6 +74,43 @@ describe("probeStatus/listModels", () => {
     expect((await probeStatus({ url: "http://h:8188" }, "comfy", 100)).reachable).toBe(true);
     expect(await listModels({ url: "http://h:8188" }, "comfy", 100)).toEqual([]);
   });
+  it("a1111 ohne Modell-Liste (Draw Things: sd-models 404): Probe fällt auf /sdapi/v1/options zurück und meldet erreichbar", async () => {
+    const urls: string[] = [];
+    rq.mockImplementation((arg) => {
+      const url = (arg as { url: string }).url;
+      urls.push(url);
+      return Promise.resolve(url.endsWith("/sdapi/v1/options") ? { status: 200, text: "{}" } : { status: 404, text: "Not Found" });
+    });
+    const st = await probeStatus({ url: "http://127.0.0.1:7860" }, "a1111", 100);
+    expect(st.reachable).toBe(true);
+    expect(st.kind).toBe("ok");
+    expect(urls).toEqual(["http://127.0.0.1:7860/sdapi/v1/sd-models", "http://127.0.0.1:7860/sdapi/v1/options"]);
+  });
+  it("a1111 mit Modell-Liste (echtes AUTOMATIC1111): eine Anfrage, kein Ausweichpfad", async () => {
+    rq.mockClear();
+    rq.mockResolvedValue({ status: 200, text: JSON.stringify([{ title: "sd" }]) });
+    expect((await probeStatus({ url: "http://h:7860" }, "a1111", 100)).reachable).toBe(true);
+    expect(rq.mock.calls.length).toBe(1);
+  });
+  it("a1111: auch der Ausweichpfad 404 → nicht erreichbar (kein Draw Things, kein A1111)", async () => {
+    rq.mockResolvedValue({ status: 404, text: "Not Found" });
+    const st = await probeStatus({ url: "http://h:7860" }, "a1111", 100);
+    expect(st.reachable).toBe(false);
+    expect(st.kind).toBe(classifyEndpointStatus({ kind: "response", status: 404, body: null }).kind);
+  });
+  it("a1111: nur 404 greift den Ausweichpfad (401 bleibt 401, kein zweiter Aufruf)", async () => {
+    rq.mockClear();
+    rq.mockResolvedValue({ status: 401, text: "" });
+    const st = await probeStatus({ url: "http://h:7860" }, "a1111", 100);
+    expect(st.reachable).toBe(false);
+    expect(rq.mock.calls.length).toBe(1);
+  });
+  it("a1111 ohne Modell-Liste: listModels liefert [] ohne zweite Anfrage (Modelle nur, wenn vorhanden)", async () => {
+    rq.mockClear();
+    rq.mockResolvedValue({ status: 404, text: "Not Found" });
+    expect(await listModels({ url: "http://h:7860" }, "a1111", 100)).toEqual([]);
+    expect(rq.mock.calls.length).toBe(1);
+  });
   it("Netzfehler → nicht erreichbar, leere Liste, kein Wurf", async () => {
     rq.mockRejectedValue(new Error("ECONNREFUSED"));
     expect((await probeStatus({ url: "http://h" }, "openai", 100)).reachable).toBe(false);

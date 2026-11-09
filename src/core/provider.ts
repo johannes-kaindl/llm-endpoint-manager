@@ -7,6 +7,9 @@ import { ANTHROPIC_URL, APPLE_SHORTCUTS_URL, DEFAULT_SHORTCUT_NAME, DEFAULT_SHOR
 export interface ProviderProbe {
   /** Pfad relativ zur normalisierten Basis-URL (ohne /v1), der Erreichbarkeit UND Modell-Liste liefert. */
   path: string;
+  /** Ausweichpfad, den NUR die Erreichbarkeits-Probe nimmt, wenn `path` mit 404 antwortet: ein Server, der die Schnittstelle spricht, aber diese Liste nicht führt
+   *  (Draw Things antwortet auf `/sdapi/v1/sd-models` mit 404, auf `/sdapi/v1/options` mit 200). Die Modell-Liste fragt ihn nie. */
+  fallbackPath?: string;
   models(body: unknown): string[];
 }
 
@@ -22,6 +25,7 @@ export function providerProbe(p: Provider): ProviderProbe | null {
     case "a1111":
       return {
         path: "/sdapi/v1/sd-models",
+        fallbackPath: "/sdapi/v1/options",
         models: (body) => Array.isArray(body)
           ? body.map((m) => (m && typeof m === "object" && typeof (m as { title?: unknown }).title === "string" ? (m as { title: string }).title : "")).filter(Boolean)
           : [],
