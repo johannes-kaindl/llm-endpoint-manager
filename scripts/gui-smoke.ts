@@ -68,6 +68,7 @@ const PUNKTE = [
   "I1 Preset Anthropic (Claude API) → Zeile mit provider/transport/backend anthropic, chat+vision, Hinweis zum Schlüssel sichtbar; die Knopfreihe der Vorlagen bricht um und liegt ganz im Fenster",
   "I2 Claude-Endpunkt gegen den Anthropic-Stub: Schlüssel setzen → Status grün, Modelle aus /v1/models, Stub sah x-api-key und anthropic-version; list()/resolve() ohne Opt-in zeigen ihn nie, mit Opt-in ja",
   "I3 Ungültiger Schlüssel → Status rot mit dem Text „Access denied — API key missing or invalid.“ (EN) bzw. dem deutschen Gegenstück",
+  "J1 URL in einer unteren Endpunkt-Zeile tippen, dann das Schlüsselfeld anklicken: die Eingabe ist übernommen, die Scrollposition bleibt, der Fokus liegt im Schlüsselfeld derselben Zeile",
 ] as const;
 const { record, abschluss } = createBilanz({ punkte: PUNKTE });
 
@@ -780,6 +781,41 @@ async function main(): Promise<void> {
       "I3 Ungültiger Schlüssel → Status rot mit dem Text „Access denied — API key missing or invalid.“ (EN) bzw. dem deutschen Gegenstück",
       statusBad !== null && ["Access denied — API key missing or invalid.", "Zugriff verweigert — Schlüssel fehlt oder ist ungültig."].includes(statusBad.tip),
       JSON.stringify(statusBad),
+    );
+
+    // J1 — der Ablauf eines Nutzers mit echten Klicks: URL einer Zeile weiter unten ändern, dann ins Schlüsselfeld wechseln. Das
+    // Übernehmen sperrt die Zeilen und baut sie neu; vorher sprang das Fenster und der Fokus ging verloren (Task „Fokus springt …“).
+    await cdp.evaluate(`
+      app.secretStorage.setSecret(${q(`${PLUGIN_ID}-${claudeEp.id}`)}, "");
+      const p = app.plugins.plugins[${q(PLUGIN_ID)}];
+      p.settings.endpoints = [1, 2, 3, 4].map((n) => ({ id: "j" + n, label: "J" + n, url: "http://localhost:" + (1240 + n), provider: "openai", capabilities: ["chat"], enabled: true }));
+      p.handle.reachability.clear();
+      await p.saveSettings();
+      return true;
+    `);
+    settings = await reopenSettings(cdp, port, settings);
+    const urlJ = settings.el(`root.querySelectorAll(".okit-ep-row")[2].querySelector("input[type=text]")`);
+    const keyJ = settings.el(`root.querySelectorAll(".okit-ep-row")[2].querySelector("input[type=password]")`);
+    const neueUrl = "http://localhost:1299";
+    const klickUrl = await clickReal(settings.cdp, urlJ);
+    await settings.cdp.evaluate(`const f = ${urlJ}; f.select(); return true;`);
+    await settings.cdp.send("Input.insertText", { text: neueUrl });
+    const klickKey = await clickReal(settings.cdp, keyJ);
+    const scrollVor = await settings.cdp.evaluate<number>(`const sc = ${settings.el(`root.querySelector(".vertical-tab-content")`)}; return Math.round(sc ? sc.scrollTop : -1);`);
+    const uebernommen = await pollUntil<{ ok: boolean }>(cdp, `
+      return app.plugins.plugins[${q(PLUGIN_ID)}].settings.endpoints[2].url === ${q(neueUrl)} ? { ok: true } : null;
+    `, 8000, 300);
+    await new Promise((r) => setTimeout(r, 2000));   // Neuaufbau nach dem Speichern und Verbinden
+    const nach = await settings.cdp.evaluate<{ scroll: number; row: number; type: string | null; disabled: boolean | null; tag: string }>(`
+      const sc = ${settings.el(`root.querySelector(".vertical-tab-content")`)};
+      const a = document.activeElement;
+      const rows = ${settings.el(`Array.from(root.querySelectorAll(".okit-ep-row"))`)};
+      return { scroll: Math.round(sc ? sc.scrollTop : -1), row: rows.findIndex((r) => r.contains(a)), type: a && a.getAttribute ? a.getAttribute("type") : null, disabled: a ? a.disabled ?? null : null, tag: a ? a.tagName : "" };
+    `);
+    record(
+      "J1 URL in einer unteren Endpunkt-Zeile tippen, dann das Schlüsselfeld anklicken: die Eingabe ist übernommen, die Scrollposition bleibt, der Fokus liegt im Schlüsselfeld derselben Zeile",
+      klickUrl && klickKey && uebernommen !== null && scrollVor > 0 && Math.abs(nach.scroll - scrollVor) <= 2 && nach.row === 2 && nach.tag === "INPUT" && nach.type === "password" && nach.disabled === false,
+      JSON.stringify({ klickUrl, klickKey, uebernommen: uebernommen !== null, scrollVor, nach }),
     );
   } finally {
     // B haengt seinen Fake-Endpunkt am Ende NICHT selbst aus — ohne diesen Schritt hinterlaesst

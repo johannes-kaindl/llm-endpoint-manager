@@ -368,3 +368,77 @@ describe("Entfernen und Nachziehen im Endpunkt-Tab", () => {
   });
 });
 
+
+describe("Neuzeichnen behält die Stelle des Nutzers", () => {
+  /** Ein Rollbalken über dem Container (eigenes Fenster: `ownerDocument.defaultView` liefert dessen `getComputedStyle`). */
+  function mitRollbalken(el: FakeEl, top: number): { scrollTop: number } {
+    const scroller = { scrollTop: top, parentElement: null, ownerDocument: { defaultView: { getComputedStyle: () => ({ overflowY: "auto" }) } } };
+    (el as unknown as { parentElement: unknown }).parentElement = scroller;
+    return scroller;
+  }
+  /** Fuehrt das Neuzeichnen aus, laesst den Neuaufbau den Rollbalken auf 0 setzen (wie ein leerer Container) und liefert die Felder, die danach Fokus bekamen. */
+  function neuzeichnen(t: LlmEndpointManagerSettingTab, scroller: { scrollTop: number }): string[] {
+    const w = t as unknown as { renderImperative(): void; refreshUi(): void; containerEl: FakeEl };
+    const original = w.renderImperative.bind(w);
+    const focused: string[] = [];
+    w.renderImperative = () => {
+      scroller.scrollTop = 0;
+      original();
+      const rows = w.containerEl.querySelectorAll(".okit-ep-row");
+      rows.forEach((row, i) => (row.querySelectorAll("input, select, textarea") as unknown as Array<{ getAttribute(k: string): string | null; focus: (o?: unknown) => void }>).forEach((f) => {
+        f.focus = () => { focused.push(`${i}:${f.getAttribute("aria-label")}`); };
+      }));
+    };
+    w.refreshUi();
+    return focused;
+  }
+  const feldAn = (el: FakeEl, zeile: number, label: string): FakeEl => {
+    const row = el.querySelectorAll(".okit-ep-row")[zeile]!;
+    const feld = (row.querySelectorAll("input, select") as unknown as FakeEl[]).find((f) => (f as unknown as { getAttribute(k: string): string | null }).getAttribute("aria-label") === label);
+    if (!feld) throw new Error(`Kein Feld „${label}“ in Zeile ${zeile}`);
+    return feld;
+  };
+  const zwei = { endpoints: [
+    { id: "e1", label: "A", url: "http://a", capabilities: ["chat"] },
+    { id: "e2", label: "B", url: "http://b", capabilities: ["chat"] },
+  ] };
+
+  it("stellt die Scrollposition wieder her, die der Neuaufbau auf 0 setzt", async () => {
+    const { tab: t, el } = await tab(zwei);
+    const scroller = mitRollbalken(el, 640);
+    neuzeichnen(t, scroller);
+    expect(scroller.scrollTop).toBe(640);
+  });
+
+  it("holt den Fokus in dasselbe Feld derselben Zeile zurück, auch wenn die Zeile neu gebaut wurde", async () => {
+    const { tab: t, el } = await tab(zwei);
+    const scroller = mitRollbalken(el, 300);
+    const token = feldAn(el, 1, "API token for http://b");
+    (el as unknown as { dispatchEvent(e: unknown): void }).dispatchEvent({ type: "focusin", target: token });
+    expect(neuzeichnen(t, scroller)).toEqual(["1:API token for http://b"]);
+  });
+
+  it("findet das Feld nach seiner Stelle, wenn die Beschriftung sich mit der Eingabe geändert hat (sie nennt die URL)", async () => {
+    const { tab: t, el, plugin } = await tab(zwei);
+    const scroller = mitRollbalken(el, 300);
+    const token = feldAn(el, 1, "API token for http://b");
+    (el as unknown as { dispatchEvent(e: unknown): void }).dispatchEvent({ type: "focusin", target: token });
+    plugin.settings.endpoints[1]!.url = "http://neu";
+    expect(neuzeichnen(t, scroller)).toEqual(["1:API token for http://neu"]);
+  });
+
+  it("holt keinen Fokus zurück, wenn der Nutzer zuletzt auf etwas anderes als ein Feld getippt hat", async () => {
+    const { tab: t, el } = await tab(zwei);
+    const scroller = mitRollbalken(el, 300);
+    const url = feldAn(el, 0, "Endpoint address");
+    const e = el as unknown as { dispatchEvent(e: unknown): void };
+    e.dispatchEvent({ type: "focusin", target: url });
+    e.dispatchEvent({ type: "pointerdown", target: { tagName: "DIV" } });
+    expect(neuzeichnen(t, scroller)).toEqual([]);
+  });
+
+  it("zeichnet ohne Rollbalken und ohne Fokusspur ohne Fehler neu", async () => {
+    const { tab: t } = await tab(zwei);
+    expect(neuzeichnen(t, { scrollTop: 0 })).toEqual([]);
+  });
+});

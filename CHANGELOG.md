@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Settings, endpoint list: after you enter an address or an API token and move on to the next field, the settings page no longer drops you out of the field you were in. The list is rebuilt after such an entry (the rows lock while the entry is saved); the page now keeps its scroll position and puts the cursor back into the same field of the same row, instead of leaving nothing focused.
+
 ## [0.9.3] — 2026-11-09
 
 ### Changed

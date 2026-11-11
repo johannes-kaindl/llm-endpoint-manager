@@ -18,6 +18,15 @@ import { firstActiveUrl } from "../core/reachability";
 import { clientFor, capabilityFetch, loadModelContext } from "./http";
 import type { ModelContext } from "../vendor/kit/model-context";
 
+/** Ein Feld in einer Endpunkt-Zeile, ohne Elementbezug: die n-te Zeile, Beschriftung des Feldes, wievieltes unter gleich beschrifteten und
+ *  seine Stelle unter allen Feldern der Zeile (Rückfall: die Beschriftung nennt die URL, und die kann sich mit der Eingabe ändern). */
+interface FieldKey { row: number; label: string; nth: number; index: number }
+/** Was der Nutzer vor einem Neuaufbau sah: wie weit das Einstellungs-Fenster gescrollt war und in welchem Feld er war. */
+interface ViewKeep { scroller: HTMLElement | null; top: number; field: FieldKey | null }
+
+const FIELD_SELECTOR = "input, select, textarea";
+const FIELD_TAGS = ["INPUT", "SELECT", "TEXTAREA"];
+
 type ItemDef = { name?: string; desc?: string; render?: (setting: Setting) => void };
 type GroupDef = { type?: string; heading?: string; items?: ItemDef[] };
 
@@ -53,6 +62,10 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
    *  Proben. Daraus bestimmt `active()` die Zeile, die `resolve("chat")` gerade bekäme. */
   private ownSaves = 0;
   private unsubscribeChanged: (() => void) | null = null;
+  /** Das Feld einer Endpunkt-Zeile, in dem der Nutzer zuletzt war (nur solange er nicht woanders hingetippt hat). Die Zeilen sperren sich
+   *  beim Übernehmen einer URL oder eines Schlüssels und werden neu gebaut; ohne diese Notiz stünde der Nutzer danach im Leeren. */
+  private lastField: FieldKey | null = null;
+  private focusWatched = false;
   private rowReach = new Map<string, boolean>();
   private rowProbes = new Map<string, Promise<unknown>>();
 
@@ -100,10 +113,68 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
     this.cleanupPrevious();
     this.containerEl.empty();
     this.cleanupPrevious = renderSettingDefinitions(this.containerEl, this.getSettingDefinitions(), this.plugin as never, this.app);
+    this.watchFocus();
   }
 
+  /** Merkt sich das zuletzt berührte Feld einer Endpunkt-Zeile. Am Container, nicht an den Zeilen: die werden neu gebaut. */
+  private watchFocus(): void {
+    if (this.focusWatched) return;
+    this.focusWatched = true;
+    this.containerEl.addEventListener("focusin", (e: Event) => { this.lastField = this.fieldKeyOf(e.target as HTMLElement | null); });
+    // Ein Tipp auf etwas anderes als ein Feld beendet die Spur: ein spätes Neuzeichnen holt den Fokus dann nicht zurück.
+    this.containerEl.addEventListener("pointerdown", (e: Event) => { if (!this.isField(e.target as HTMLElement | null)) this.lastField = null; });
+  }
+
+  private isField(el: HTMLElement | null): boolean {
+    return !!el && FIELD_TAGS.includes(String(el.tagName).toUpperCase());
+  }
+
+  /** Die Felder jeder Endpunkt-Zeile, in Dokumentreihenfolge (Zeile → Felder). */
+  private rowFields(): HTMLElement[][] {
+    return Array.from(this.containerEl.querySelectorAll<HTMLElement>(".okit-ep-row"))
+      .map((r) => Array.from(r.querySelectorAll<HTMLElement>(FIELD_SELECTOR)));
+  }
+
+  private fieldKeyOf(el: HTMLElement | null): FieldKey | null {
+    if (!el || !this.isField(el)) return null;
+    const rows = this.rowFields();
+    const row = rows.findIndex((fields) => fields.includes(el));
+    const label = el.getAttribute("aria-label");
+    if (row < 0 || !label) return null;
+    const same = (rows[row] ?? []).filter((f) => f.getAttribute("aria-label") === label);
+    return { row, label, nth: Math.max(0, same.indexOf(el)), index: (rows[row] ?? []).indexOf(el) };
+  }
+
+  /** Der Rollbalken des Einstellungs-Fensters: der nächste Vorfahre, der scrollt. `getComputedStyle` des Fensters, in dem das
+   *  Element lebt (die Einstellungen sind ein eigenes Fenster, das globale `getComputedStyle` wäre das des Hauptfensters). */
+  private scrollerOf(el: HTMLElement): HTMLElement | null {
+    for (let a = el.parentElement; a; a = a.parentElement) {
+      const overflow = a.ownerDocument?.defaultView?.getComputedStyle(a).overflowY ?? "";
+      if (overflow === "auto" || overflow === "scroll") return a;
+    }
+    return null;
+  }
+
+  private keepView(): ViewKeep {
+    const scroller = this.scrollerOf(this.containerEl);
+    return { scroller, top: scroller?.scrollTop ?? 0, field: this.lastField };
+  }
+
+  private restoreView(keep: ViewKeep): void {
+    if (keep.scroller) keep.scroller.scrollTop = keep.top;
+    const f = keep.field;
+    if (!f) return;
+    const fields = this.rowFields()[f.row] ?? [];
+    const target = fields.filter((x) => x.getAttribute("aria-label") === f.label)[f.nth] ?? fields[f.index];
+    // preventScroll: der Fokus holt die Zeile nicht in die Fenstermitte, die Lage bleibt, wie der Nutzer sie hatte.
+    target?.focus({ preventScroll: true });
+  }
+
+  /** Neu zeichnen, ohne dass der Nutzer die Stelle verliert: Scrollposition und das Feld, in dem er war, bleiben. */
   private refreshUi(): void {
+    const keep = this.keepView();
     refreshSettingsTab(this, () => { this.renderImperative(); });
+    this.restoreView(keep);
   }
 
   private endpointStrings(): EndpointListStrings {
