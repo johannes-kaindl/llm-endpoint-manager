@@ -124,6 +124,9 @@
 /* Die Kit-Regeln für die Endpunkt-Zeile sind seit 0.43.0 Kindselektoren (`.okit-ep-row > …`) und treffen
    die verschachtelten Zusatzzeilen nicht mehr; der frühere Rückbau (`display: block` auf den Info-Block,
    `width: auto` auf das Control) ist damit überflüssig. */
+/* Die Zeile des Endpunkts vererbt `text-align: end` an die Zusatzzeilen: im schmalen Fenster stand „Aktiv“ rechtsbündig in seinem Namensfeld, versetzt
+   zum Schalter darunter (gemessen am Bild, Fenster 610 px). Der Kit-Container ist ein umbrechendes Flex-Feld und bleibt es. */
+.okit-ep-extra { text-align: start; }
 .okit-ep-extra .setting-item { flex-wrap: wrap; gap: var(--size-4-2); }
 /* Die Fähigkeiten-Beschriftung ist ein ganzer Satz — eigene Zeile über den vier Schaltern statt
    daneben gequetscht (schmales Fenster, Screenshot 2026-09-25). */

@@ -9,7 +9,7 @@ All notable changes to this project are documented here. The format follows
 ### Changed
 
 - Settings, endpoint list: the rows **Capabilities** and **Backend** now carry a short name with the explanation as a description underneath, instead of a whole sentence as the name. The wording is unchanged.
-- Settings, endpoint list: the short, unevenly long divider lines inside an endpoint's block (above **Protocol** and **Enabled**) are gone on Obsidian 1.13 and newer; the block reads as one unit, and the line between two endpoints stays.
+- Settings, endpoint list: the short, unevenly long divider lines inside an endpoint's block (above **Protocol** and **Enabled**) are gone on Obsidian 1.13 and newer; the block reads as one unit, and the line between two endpoints stays. In a narrow window the name **Enabled** no longer sits right-aligned and offset from its switch.
 
 ### Fixed
 
