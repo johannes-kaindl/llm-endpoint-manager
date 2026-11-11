@@ -69,6 +69,7 @@ const PUNKTE = [
   "I2 Claude-Endpunkt gegen den Anthropic-Stub: Schlüssel setzen → Status grün, Modelle aus /v1/models, Stub sah x-api-key und anthropic-version; list()/resolve() ohne Opt-in zeigen ihn nie, mit Opt-in ja",
   "I3 Ungültiger Schlüssel → Status rot mit dem Text „Access denied — API key missing or invalid.“ (EN) bzw. dem deutschen Gegenstück",
   "J1 URL in einer unteren Endpunkt-Zeile tippen, dann das Schlüsselfeld anklicken: die Eingabe ist übernommen, die Scrollposition bleibt, der Fokus liegt im Schlüsselfeld derselben Zeile",
+  "J2 URL in einer unteren Endpunkt-Zeile tippen, dann neben das Feld tippen (kein Feld): die Eingabe ist übernommen, die Scrollposition bleibt, der Fokus springt nicht in ein Feld der ersten Zeile",
 ] as const;
 const { record, abschluss } = createBilanz({ punkte: PUNKTE });
 
@@ -816,6 +817,37 @@ async function main(): Promise<void> {
       "J1 URL in einer unteren Endpunkt-Zeile tippen, dann das Schlüsselfeld anklicken: die Eingabe ist übernommen, die Scrollposition bleibt, der Fokus liegt im Schlüsselfeld derselben Zeile",
       klickUrl && klickKey && uebernommen !== null && scrollVor > 0 && Math.abs(nach.scroll - scrollVor) <= 2 && nach.row === 2 && nach.tag === "INPUT" && nach.type === "password" && nach.disabled === false,
       JSON.stringify({ klickUrl, klickKey, uebernommen: uebernommen !== null, scrollVor, nach }),
+    );
+
+    // J2 — wie J1, aber der Nutzer tippt nach der URL NEBEN das Feld (auf Text im Zusatzblock) statt in ein Nachbarfeld. Das Übernehmen
+    // zeichnet die Liste neu, und Obsidian fokussiert dann das erste Feld der Liste (Zeile 1); am iPhone sprang die Seite dorthin.
+    const urlJ2 = settings.el(`root.querySelectorAll(".okit-ep-row")[2].querySelector("input[type=text]")`);
+    const namensText = settings.el(`(() => { const rs = [...root.querySelectorAll(".okit-ep-row")]; const b = rs[2].getBoundingClientRect().bottom; return [...root.querySelectorAll(".okit-ep-extra .setting-item-name")].find((n) => n.getBoundingClientRect().top > b); })()`);
+    const neueUrl2 = "http://localhost:1298";
+    const klickUrl2 = await clickReal(settings.cdp, urlJ2);
+    await settings.cdp.evaluate(`const f = ${urlJ2}; f.select(); return true;`);
+    await settings.cdp.send("Input.insertText", { text: neueUrl2 });
+    // Den Text neben dem Feld in die Fenstermitte holen: `clickReal` scrollt das Ziel selbst dorthin und würde die Messung verfälschen (gemessen: ein scroll-Ereignis 1 ms nach Start, vom Treiber).
+    await settings.cdp.evaluate(`const sc = ${settings.el(`root.querySelector(".vertical-tab-content")`)}; const n = ${namensText}; const sr = sc.getBoundingClientRect(), nr = n.getBoundingClientRect(); sc.scrollTop += nr.top + nr.height / 2 - (sr.top + sr.height / 2); await new Promise((x) => setTimeout(x, 300)); return true;`);
+    const scrollVor2 = await settings.cdp.evaluate<number>(`const sc = ${settings.el(`root.querySelector(".vertical-tab-content")`)}; return Math.round(sc ? sc.scrollTop : -1);`);
+    const zielInfo = await settings.cdp.evaluate<string>(`const n = ${namensText}; if (!n) return "kein Element"; const r = n.getBoundingClientRect(); return JSON.stringify({ top: Math.round(r.top), h: Math.round(r.height), w: Math.round(r.width), vh: innerHeight, text: n.textContent.slice(0, 20) });`);
+    await settings.cdp.evaluate(`const sc = ${settings.el(`root.querySelector(".vertical-tab-content")`)}; window.__sj = []; const t0 = performance.now(); sc.addEventListener("scroll", () => window.__sj.push([Math.round(performance.now() - t0), Math.round(sc.scrollTop)])); document.addEventListener("focusin", (e) => window.__sj.push([Math.round(performance.now() - t0), "focusin " + (e.target.getAttribute && e.target.getAttribute("aria-label") || e.target.tagName)]), true); return true;`);
+    const klickDanebe = await clickReal(settings.cdp, namensText);
+    const uebernommen2 = await pollUntil<{ ok: boolean }>(cdp, `
+      return app.plugins.plugins[${q(PLUGIN_ID)}].settings.endpoints[2].url === ${q(neueUrl2)} ? { ok: true } : null;
+    `, 8000, 300);
+    await new Promise((r) => setTimeout(r, 2000));
+    const nach2 = await settings.cdp.evaluate<{ scroll: number; max: number; row: number; tag: string }>(`
+      const sc = ${settings.el(`root.querySelector(".vertical-tab-content")`)};
+      const a = document.activeElement;
+      const rows = ${settings.el(`Array.from(root.querySelectorAll(".okit-ep-row"))`)};
+      return { scroll: Math.round(sc ? sc.scrollTop : -1), max: Math.round(sc ? sc.scrollHeight - sc.clientHeight : -1), row: rows.findIndex((r) => r.contains(a)), tag: a ? a.tagName : "" };
+    `);
+    const spur = await settings.cdp.evaluate<string>(`return JSON.stringify((window.__sj || []).slice(0, 14));`);
+    record(
+      "J2 URL in einer unteren Endpunkt-Zeile tippen, dann neben das Feld tippen (kein Feld): die Eingabe ist übernommen, die Scrollposition bleibt, der Fokus springt nicht in ein Feld der ersten Zeile",
+      klickUrl2 && klickDanebe && uebernommen2 !== null && scrollVor2 > 0 && Math.abs(nach2.scroll - Math.min(scrollVor2, nach2.max)) <= 2 && nach2.row !== 0 && !(nach2.row >= 0 && nach2.tag === "INPUT"),
+      JSON.stringify({ spur, zielInfo, klickUrl2, klickDanebe, uebernommen: uebernommen2 !== null, scrollVor2, nach2 }),
     );
   } finally {
     // B haengt seinen Fake-Endpunkt am Ende NICHT selbst aus — ohne diesen Schritt hinterlaesst

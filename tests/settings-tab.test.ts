@@ -462,6 +462,31 @@ describe("Neuzeichnen behält die Stelle des Nutzers", () => {
     expect(neuzeichnen(t, scroller)).toEqual([]);
   });
 
+  it("lässt das aktive Element der Liste vor dem Neuzeichnen los: Obsidian fokussiert sonst das erste Feld der ganzen Liste (Zeile 1)", async () => {
+    const { tab: t, el } = await tab(zwei);
+    const scroller = mitRollbalken(el, 300);
+    const geblurt: string[] = [];
+    const aktiv = { tagName: "DIV", blur: () => geblurt.push("aktiv") };
+    const ext = el as unknown as { ownerDocument: unknown; contains: (x: unknown) => boolean };
+    ext.ownerDocument = { body: {}, activeElement: aktiv };
+    ext.contains = (x) => x === aktiv;
+    const w = t as unknown as { renderImperative(): void; refreshUi(): void };
+    const original = w.renderImperative.bind(w);
+    w.renderImperative = () => { geblurt.push("neu"); original(); };
+    w.refreshUi();
+    expect(geblurt).toEqual(["aktiv", "neu"]);
+    expect(scroller.scrollTop).toBe(300);
+  });
+
+  it("lässt nichts los, was nicht in der Liste liegt (Körper, anderes Fenster)", async () => {
+    const { tab: t, el } = await tab(zwei);
+    const body = { tagName: "BODY", blur: () => { throw new Error("blur"); } };
+    const ext = el as unknown as { ownerDocument: unknown; contains: (x: unknown) => boolean };
+    ext.ownerDocument = { body, activeElement: body };
+    ext.contains = () => true;
+    expect(() => (t as unknown as { refreshUi(): void }).refreshUi()).not.toThrow();
+  });
+
   it("zeichnet ohne Rollbalken und ohne Fokusspur ohne Fehler neu", async () => {
     const { tab: t } = await tab(zwei);
     expect(neuzeichnen(t, { scrollTop: 0 })).toEqual([]);

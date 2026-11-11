@@ -170,18 +170,30 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
   }
 
   private restoreView(keep: ViewKeep): void {
-    if (keep.scroller) keep.scroller.scrollTop = keep.top;
     const f = keep.field;
-    if (!f) return;
-    const fields = this.rowFields()[f.row] ?? [];
-    const target = fields.filter((x) => x.getAttribute("aria-label") === f.label)[f.nth] ?? fields[f.index];
-    // preventScroll: der Fokus holt die Zeile nicht in die Fenstermitte, die Lage bleibt, wie der Nutzer sie hatte.
-    target?.focus({ preventScroll: true });
+    if (f) {
+      const fields = this.rowFields()[f.row] ?? [];
+      const target = fields.filter((x) => x.getAttribute("aria-label") === f.label)[f.nth] ?? fields[f.index];
+      // preventScroll: der Fokus holt die Zeile nicht in die Fenstermitte, die Lage bleibt, wie der Nutzer sie hatte.
+      target?.focus({ preventScroll: true });
+    }
+    // Zuletzt, nach jedem Fokus: ein Fokus kann (iOS) das Fenster verschieben.
+    if (keep.scroller) keep.scroller.scrollTop = keep.top;
+  }
+
+  /** Lässt das Element los, das gerade Fokus hat, wenn es in der Liste steckt. Zeichnet Obsidian eine Einstellung neu, in der das aktive
+   *  Element liegt, fokussiert es danach das erste fokussierbare Element dieser Einstellung (app.js `fc`, Obsidian 1.15.1) — bei uns das
+   *  URL-Feld der ersten Zeile, weil die ganze Endpunkt-Liste eine einzige Einstellung ist. Am Telefon springt die Seite dorthin. */
+  private releaseFocus(): void {
+    const doc = this.containerEl.ownerDocument;
+    const active = doc?.activeElement as HTMLElement | null | undefined;
+    if (active && active !== doc.body && this.containerEl.contains(active)) active.blur();
   }
 
   /** Neu zeichnen, ohne dass der Nutzer die Stelle verliert: Scrollposition und das Feld, in dem er war, bleiben. */
   private refreshUi(): void {
     const keep = this.keepView();
+    this.releaseFocus();
     refreshSettingsTab(this, () => { this.renderImperative(); });
     this.restoreView(keep);
   }
