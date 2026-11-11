@@ -116,13 +116,23 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
     this.watchFocus();
   }
 
-  /** Merkt sich das zuletzt berührte Feld einer Endpunkt-Zeile. Am Container, nicht an den Zeilen: die werden neu gebaut. */
+  /** Merkt sich das Feld einer Endpunkt-Zeile, in das der Nutzer als Nächstes will. Am Container, nicht an den Zeilen: die werden neu gebaut.
+   *  `focusin` allein reicht nicht: das Übernehmen einer Eingabe (blur des Feldes davor) sperrt alle Felder, noch bevor das nächste den Fokus
+   *  bekommt; es meldet nie `focusin`. Darum zählt schon der Fingerdruck (`pointerdown`, vor dem blur) und bei Tab das folgende Feld. */
   private watchFocus(): void {
     if (this.focusWatched) return;
     this.focusWatched = true;
     this.containerEl.addEventListener("focusin", (e: Event) => { this.lastField = this.fieldKeyOf(e.target as HTMLElement | null); });
     // Ein Tipp auf etwas anderes als ein Feld beendet die Spur: ein spätes Neuzeichnen holt den Fokus dann nicht zurück.
-    this.containerEl.addEventListener("pointerdown", (e: Event) => { if (!this.isField(e.target as HTMLElement | null)) this.lastField = null; });
+    this.containerEl.addEventListener("pointerdown", (e: Event) => { this.lastField = this.fieldKeyOf(e.target as HTMLElement | null); }, true);
+    this.containerEl.addEventListener("keydown", (e: Event) => {
+      const k = e as KeyboardEvent;
+      if (k.key !== "Tab") return;
+      const flat = this.rowFields().flat();
+      const at = flat.indexOf(k.target as HTMLElement);
+      if (at < 0) return;
+      this.lastField = this.fieldKeyOf(flat[at + (k.shiftKey ? -1 : 1)] ?? null);
+    }, true);
   }
 
   private isField(el: HTMLElement | null): boolean {

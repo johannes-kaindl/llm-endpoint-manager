@@ -427,6 +427,20 @@ describe("Neuzeichnen behält die Stelle des Nutzers", () => {
     expect(neuzeichnen(t, scroller)).toEqual(["1:API token for http://neu"]);
   });
 
+  it("kennt das Ziel schon vor dem Fokus: Fingerdruck auf ein Feld (das Übernehmen sperrt es, bevor es focusin meldet) und Tab zum nächsten Feld", async () => {
+    const { tab: t, el } = await tab(zwei);
+    const scroller = mitRollbalken(el, 300);
+    const e = el as unknown as { dispatchEvent(e: unknown): void };
+    const token = feldAn(el, 1, "API token for http://b");
+    e.dispatchEvent({ type: "pointerdown", target: token });   // kein focusin danach: das Feld ist schon gesperrt
+    expect(neuzeichnen(t, scroller)).toEqual(["1:API token for http://b"]);
+    const url = feldAn(el, 1, "Endpoint address");   // nach dem Neuaufbau frisch suchen
+    const felder = (el.querySelectorAll(".okit-ep-row")[1]!.querySelectorAll("input, select") as unknown as FakeEl[]);
+    const nachUrl = felder[felder.indexOf(url) + 1]!;
+    e.dispatchEvent({ type: "keydown", key: "Tab", shiftKey: false, target: url });
+    expect(neuzeichnen(t, scroller)).toEqual([`1:${(nachUrl as unknown as { getAttribute(k: string): string }).getAttribute("aria-label")}`]);
+  });
+
   it("holt keinen Fokus zurück, wenn der Nutzer zuletzt auf etwas anderes als ein Feld getippt hat", async () => {
     const { tab: t, el } = await tab(zwei);
     const scroller = mitRollbalken(el, 300);
