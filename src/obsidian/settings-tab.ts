@@ -113,7 +113,6 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
     this.cleanupPrevious();
     this.containerEl.empty();
     this.cleanupPrevious = renderSettingDefinitions(this.containerEl, this.getSettingDefinitions(), this.plugin as never, this.app);
-    this.watchFocus();
   }
 
   /** Merkt sich das Feld einer Endpunkt-Zeile, in das der Nutzer als Nächstes will. Am Container, nicht an den Zeilen: die werden neu gebaut.
@@ -298,6 +297,9 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
   private renderEndpoints(setting: Setting): void {
     this.rowReach.clear(); this.rowProbes.clear();
     this.watchChanges();
+    // Ab Obsidian 1.13 zeichnet Obsidian den Tab selbst aus `getSettingDefinitions()`; `display()` läuft dort nicht. Diese Methode läuft in
+    // beiden Wegen, ihr Container überlebt jedes Neuzeichnen.
+    this.watchFocus();
     const listHost = settingBodyHost(setting);
     buildEndpointList<ManagedEndpoint>({
       containerEl: listHost,

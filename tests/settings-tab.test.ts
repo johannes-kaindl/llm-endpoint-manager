@@ -441,6 +441,17 @@ describe("Neuzeichnen behält die Stelle des Nutzers", () => {
     expect(neuzeichnen(t, scroller)).toEqual([`1:${(nachUrl as unknown as { getAttribute(k: string): string }).getAttribute("aria-label")}`]);
   });
 
+  it("beobachtet die Felder auch, wenn Obsidian den Tab selbst aus den Definitionen zeichnet (kein display())", async () => {
+    const app = makeFakeApp();
+    const { plugin } = await tab(zwei, app);
+    const t = new LlmEndpointManagerSettingTab(app, plugin);   // frisch, display() nie gerufen
+    const el = t.containerEl as unknown as FakeEl;
+    (t as unknown as { renderEndpoints(s: Setting): void }).renderEndpoints(new Setting(t.containerEl));   // der Render-Haken der Definition
+    const token = feldAn(el, 1, "API token for http://b");
+    (el as unknown as { dispatchEvent(e: unknown): void }).dispatchEvent({ type: "pointerdown", target: token });
+    expect((t as unknown as { lastField: { row: number; label: string } | null }).lastField).toMatchObject({ row: 1, label: "API token for http://b" });
+  });
+
   it("holt keinen Fokus zurück, wenn der Nutzer zuletzt auf etwas anderes als ein Feld getippt hat", async () => {
     const { tab: t, el } = await tab(zwei);
     const scroller = mitRollbalken(el, 300);
