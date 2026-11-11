@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.9.4] — 2026-11-11
+
 ### Changed
 
 - Settings, endpoint list: the rows **Capabilities** and **Backend** now carry a short name with the explanation as a description underneath, instead of a whole sentence as the name. The wording is unchanged.
