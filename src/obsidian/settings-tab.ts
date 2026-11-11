@@ -345,7 +345,7 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
       // im Settings-Tab und lebt in `this.modelLists`, nicht im Handle.
       d.onChange((v) => { this.modelLists.invalidate(normalizeEndpoint(cfg.url)); void save((e) => { withProvider(e, v as Provider); e.capabilities = capabilitiesForProvider(e.capabilities, v as Provider); }).then(() => this.refreshUi()); });
     });
-    const caps = new Setting(host).setName(t("row.capabilities"));
+    const caps = new Setting(host).setName(t("row.capabilities")).setDesc(t("row.capabilitiesDesc"));
     // Eigene Klasse statt `:has(.lem-cap)` in styles.css (Store-Befund „Avoid :has“, 0.2.3).
     caps.settingEl.addClass("lem-cap-row");
     for (const c of CAPABILITIES) {
@@ -493,7 +493,7 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
   }
 
   private renderBackend(host: HTMLElement, cfg: ManagedEndpoint): void {
-    new Setting(host).setName(t("backend.name")).addDropdown((d) => {
+    new Setting(host).setName(t("backend.name")).setDesc(t("backend.desc")).addDropdown((d) => {
       d.addOption("", t("models.familyAuto"));
       for (const b of BACKEND_IDS) d.addOption(b, BACKENDS[b].label);
       d.selectEl.setAttribute("aria-label", t("backend.name"));

@@ -16,13 +16,13 @@ describe("STRINGS", () => {
     expect(STRINGS.en["set.endpointsDesc"]).toMatch(/server address/i);
     expect(STRINGS.de["set.endpointsDesc"]).toMatch(/Serveradresse/);
   });
-  it("kein Fachbegriff ohne Auflösung: 'Capability' wird bei row.capabilities erklärt", () => {
-    expect(STRINGS.en["row.capabilities"]).toMatch(/chat/i);
-    expect(STRINGS.en["row.capabilities"]).toMatch(/embedding/i);
-    expect(STRINGS.en["row.capabilities"]).toMatch(/vision/i);
-    expect(STRINGS.en["row.capabilities"]).toMatch(/image/i);
-    expect(STRINGS.de["row.capabilities"]).toMatch(/Chat/);
-    expect(STRINGS.de["row.capabilities"]).toMatch(/Embedding/);
+  it("kein Fachbegriff ohne Auflösung: 'Capability' wird bei row.capabilitiesDesc erklärt", () => {
+    expect(STRINGS.en["row.capabilitiesDesc"]).toMatch(/chat/i);
+    expect(STRINGS.en["row.capabilitiesDesc"]).toMatch(/embedding/i);
+    expect(STRINGS.en["row.capabilitiesDesc"]).toMatch(/vision/i);
+    expect(STRINGS.en["row.capabilitiesDesc"]).toMatch(/image/i);
+    expect(STRINGS.de["row.capabilitiesDesc"]).toMatch(/Chat/);
+    expect(STRINGS.de["row.capabilitiesDesc"]).toMatch(/Embedding/);
   });
   it("set.keychainOk sagt, was der Zustand für Nutzer heißt, ohne Fachbegriff (Klartext/Schlüsselbund)", () => {
     expect(STRINGS.en["set.keychainOk"]).not.toMatch(/plain text|keychain/i);

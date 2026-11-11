@@ -114,6 +114,10 @@
 
 /* Zusatzzeile je Endpunkt (Label, Protokoll, Fähigkeiten, aktiv) — okit-ep-extra kommt aus dem Kit. */
 .okit-ep-extra .setting-item { border: none; padding: 4px 0; }
+/* Obsidian 1.13+ zieht die Trennlinie jeder Einstellungszeile als ::before (Rand oben, links/rechts eingerückt). In der Zusatzzeile
+   eines Endpunkts hing sie an jedem der schmalen Einträge und ergab kurze, ungleich lange Striche über Protokoll und „Aktiv“; die
+   Zeilen gehören zusammen und brauchen keine eigene Trennung, den Endpunkt vom nächsten trennt die Linie der Endpunkt-Zeile. */
+.setting-group .okit-ep-extra .setting-item:not(.setting-item-heading)::before { content: none; }
 .okit-ep-extra .setting-item-name { font-size: var(--font-ui-small); color: var(--text-muted); }
 .lem-cap-label { font-size: var(--font-ui-smaller); color: var(--text-muted); }
 .lem-cap { display: inline-flex; align-items: center; gap: var(--size-4-2); margin-right: 10px; }

@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- Settings, endpoint list: the rows **Capabilities** and **Backend** now carry a short name with the explanation as a description underneath, instead of a whole sentence as the name. The wording is unchanged.
+- Settings, endpoint list: the short, unevenly long divider lines inside an endpoint's block (above **Protocol** and **Enabled**) are gone on Obsidian 1.13 and newer; the block reads as one unit, and the line between two endpoints stays.
+
 ### Fixed
 
 - Settings, endpoint list: after you enter an address or an API token and move on to the next field, the settings page no longer drops you out of the field you were in. The list is rebuilt after such an entry (the rows lock while the entry is saved); the page now keeps its scroll position and puts the cursor back into the same field of the same row, instead of leaving nothing focused.
