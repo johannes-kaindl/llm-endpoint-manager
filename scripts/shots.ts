@@ -27,7 +27,7 @@
 
 import { argv, cwd, exit } from "node:process";
 
-import { Cdp, attachTo, requireUntil, requireVisible } from "../../tools/obsidian-cdp/cdp.js";
+import { Cdp, attachTo, bereiteInstanzVor, requireUntil, requireVisible } from "../../tools/obsidian-cdp/cdp.js";
 import { startLlmStub, type LlmStub } from "../../tools/obsidian-cdp/llm-stub.js";
 import { capture, setWindowSize, writeShot, type Rect } from "../../tools/obsidian-cdp/shot.js";
 import { buildVault, stagingVaultDir } from "../../tools/obsidian-cdp/vault.js";
@@ -37,6 +37,8 @@ const REPO_NAME = "llm-endpoint-manager";
 const CAPTURE_WIDTH = 1200;
 const THUMB_WIDTH = 380;
 const WINDOW = { width: 1000, height: 900 };   // unter der kleinsten Bildschirmhoehe, sonst lehnt Electron ab
+
+const ENDPOINTS_HEIGHT = 940;   // nur für endpoints.png (gemessen 2026-11-12: Bildschirm 949 px hoch verfügbar); ein kleineres Display kappt es, `ausschnitt` bricht dann ab statt abzuschneiden
 
 const LM_PORT = 1235;
 const OLLAMA_PORT = 11435;
@@ -134,10 +136,12 @@ async function ausschnitt(win: Cdp, opts: { scrollTop?: number; scrollTo?: strin
     ${opts.scrollTo ? `const anchor = ${opts.scrollTo}; sc.scrollTop = 0; sc.scrollTop = anchor.getBoundingClientRect().top - sc.getBoundingClientRect().top - 24;` : `sc.scrollTop = ${opts.scrollTop ?? 0};`}
     await new Promise((r) => setTimeout(r, 400));
     const von = (${opts.von}).getBoundingClientRect(), bis = (${opts.bis}).getBoundingClientRect();
-    return JSON.stringify({ top: von.top, bottom: bis.bottom, w: innerWidth });
+    return JSON.stringify({ top: von.top, bottom: bis.bottom, w: innerWidth, h: innerHeight });
   `);
   if (!raw) throw new Error("Ausschnitt nicht bestimmbar");
-  const r = JSON.parse(raw) as { top: number; bottom: number; w: number };
+  const r = JSON.parse(raw) as { top: number; bottom: number; w: number; h: number };
+  // Ein Bereich, der unter dem Fenster endet, kommt als schwarzer Streifen und abgeschnittener Inhalt ins Bild (Welle 33: endpoints.png nach Welle 32, Zeilen höher als das Fenster).
+  if (r.bottom > r.h) throw new Error(`Bereich endet bei ${Math.round(r.bottom)} px, das Fenster ist ${r.h} px hoch — Fenster höher stellen oder den Bereich kürzen.`);
   const x0 = opts.x0 ?? 270;
   const y = Math.max(0, r.top - (opts.padTop ?? 16));
   return { x: x0, y, width: opts.width ?? r.w - x0, height: r.bottom + (opts.padBottom ?? 16) - y };
@@ -184,6 +188,8 @@ async function main(): Promise<void> {
   const fakes: Fake[] = [];
   let settingsWin: Cdp | null = null;
   try {
+    // Vertrauensdialog und Restricted Mode eines frischen Profils (ohne den Aufruf: „Plugin nicht geladen“, Welle 33).
+    await bereiteInstanzVor(ws, { pluginIds: [PLUGIN_ID], nurVault: REPO_NAME, sprache: "en" });
     await requireVisible(ws);
 
     // Aufnahmesprache: Englisch (README.md ist kanonisch). Die Pruefung liest die Sprache aus
@@ -221,8 +227,11 @@ async function main(): Promise<void> {
       await aufnehmen(settingsWin, "hero.png", { x: 0, y: 0, width: fenster.w, height: fenster.h }, outDir);
     }
     if (want("endpoints")) {
+      // Mit den höheren Zeilen seit Welle 32 passt der Bereich bis „Check connections“ nicht mehr in 900 px; nur für dieses Bild höher stellen.
+      await setWindowSize(settingsWin, breite ?? WINDOW.width, ENDPOINTS_HEIGHT);
+      await new Promise((r) => setTimeout(r, 800));
       const box = await ausschnitt(settingsWin, {
-        scrollTo: "rowOf(1)", von: "rowOf(1)", bis: "[...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Check connections')", ...(breite === undefined ? { width: 712 } : {}), padBottom: 4,
+        scrollTo: "rowOf(1)", von: "rowOf(1)", bis: "[...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Check connections')", ...(breite === undefined ? { width: 712 } : {}), padTop: 4, padBottom: 4,
       });
       await aufnehmen(settingsWin, breite === undefined ? "endpoints.png" : `endpoints-${breite}.png`, box, outDir);
     }

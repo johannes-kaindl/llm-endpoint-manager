@@ -8,6 +8,8 @@ The plugin has no view of its own, so every image shows its settings tab. Since 
 
 **2026-09-26: all four images recorded** in a second Obsidian instance (own profile, own debug port, Obsidian 1.14.2, English interface, light theme) against the fixture vault in `fixture/`. Every image was looked at after recording.
 
+**2026-11-12: `hero.png` and `endpoints.png` recorded again** (Obsidian 1.15.1, same setup) because the extra rows of an endpoint look different since 0.9.4. `endpoints.png` is taken in a window 940 px high instead of 900: with the taller rows the range down to **Check connections** no longer fits into 900 px, and `scripts/shots.ts` now stops with a message instead of cutting a picture off. `models.png` and `consumers.png` were not touched. Both new images were looked at after recording.
+
 ## Images
 
 | Datei | Klasse | referenziert von | muss zeigen |

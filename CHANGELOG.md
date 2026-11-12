@@ -12,6 +12,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- Documentation: the README images **hero** and **endpoints** show the settings as they look since 0.9.4 (the extra rows of an endpoint with their own labels).
 - API, `materialize(id)`: an endpoint that speaks another wire format (the Claude endpoint) is no longer handed out to a plugin that did not ask for it in `transports`, even when it names the endpoint by id; the call answers `not-found`, like `list()` and `resolve()` already do. A plugin that opts in (`transports: ["http", "anthropic"]`) gets it as before.
 
 ## [0.9.4] — 2026-11-11
