@@ -1,8 +1,8 @@
 # GUI-Smoke — llm-endpoint-manager
 
-Faehrt die Pruefpunkte (Soll-Liste `PUNKTE` im Treiber) gegen ein LAUFENDES Obsidian (CDP, CORE-TEST-02 b): Schluesselbund
+Faehrt die 22 Pruefpunkte (Soll-Liste `PUNKTE` im Treiber) gegen ein LAUFENDES Obsidian (CDP, CORE-TEST-02 b): Schluesselbund
 (A1-A5), API gegen einen im Treiber selbst laufenden Fake-Endpunkt (B1-B3), Restricted-Mode-
-Guard einer frischen Zweitinstanz (C1). Treiber: `scripts/gui-smoke.ts`.
+Guard einer frischen Zweitinstanz (C1) und Aufräumprüfung (C2), Modellblock und Familie (D1-D3), Zusatzzeile (E1), Hilfe-Zeile (F1), Apple Intelligence (G1-G2), verwaiste Schlüssel (H1), Claude-API (I1-I3), Fokus und Scrollposition beim Neuzeichnen (J1-J2). Treiber: `scripts/gui-smoke.ts`.
 
 ## Voraussetzung
 
@@ -46,6 +46,20 @@ greift (Obsidian haelt `main.js` sonst im Speicher).
 | B1 | `api.list({capability:"embedding"})` gegen den Mini-HTTP-Server des Treibers (`startFakeEndpoint`, koda-agent-Muster) → genau der Eintrag mit dieser Fähigkeit. |
 | B2 | `api.resolve("chat", {caller:"gui-smoke"})` → `config.url` zeigt auf den Fake-Server; Konsumenten-Übersicht im Settings-Tab zeigt nach Re-Render „gui-smoke — chat" / „gui-smoke — Chat". |
 | B3 | Fake-Server stoppen → `api.resolve("chat")` liefert `{error:"no-endpoint"}`; **innerhalb der TTL (30 s)**, auch nachdem der Server auf demselben Port wieder läuft, bleibt es bei `no-endpoint` (Reachability-Cache hält das negative Ergebnis); `api.models(id, {force:true})` — ein UNABHÄNGIGER Cache ohne TTL-Bindung an `resolve()` — liefert danach wieder die Modell-Liste des Servers. |
+| C2 | Keine liegen gebliebenen Test-Endpunkte aus einem abgebrochenen Vorlauf in den Einstellungen. |
+| D1 | Modellblock sichtbar: Zeile für `verdigado-pro`. |
+| D2 | Familie für ein Alias setzen → nach Neuladen der Einstellungen steht sie wieder da. |
+| D3 | „Erkennen“ gegen ein Fake-LM-Studio liefert `lmstudio` (nur Lesen, kein Modell-Load). |
+| E1 | Zusatzzeile eines Endpunkts: Bezeichnung, Protokoll, Fähigkeiten und Aktiv sind sichtbar beschriftet. |
+| F1 | Hilfe-Zeile ist die erste Zeile, sichtbar, mit „Open documentation“ und Bug-Knopf. |
+| G1 | Preset „Apple Intelligence (on-device)“ → Zeile mit `transport=shortcuts`, Kurzbefehl-Name, kein HTTP-Ziel, Modellzeile `apple-fm` (displayFamily) und Modellblock aus Kit-Daten. |
+| G2 | Filter-Default: `list()` ohne `transports`-Opt-in zeigt den Apple-Shortcuts-Eintrag nicht, `list({transports:["shortcuts"]})` zeigt ihn, `resolve()` bleibt bei `http`; der Opt-in-Eintrag trägt displayFamily `apple-fm`. |
+| H1 | Verwaiste Schlüsselbund-Einträge: Zeile mit Zahl und Knopf „Clean up“, Bestätigung, danach Eintrag gelöscht und Zeile weg. |
+| I1 | Preset „Anthropic (Claude API)“ → Zeile mit provider/transport/backend `anthropic`, chat+vision, Hinweis zum Schlüssel sichtbar; die Knopfreihe der Vorlagen bricht um und liegt ganz im Fenster. |
+| I2 | Claude-Endpunkt gegen den Anthropic-Stub: Schlüssel setzen → Status grün, Modelle aus `/v1/models`, der Stub sah `x-api-key` und `anthropic-version`; `list()`/`resolve()` ohne Opt-in zeigen ihn nie, mit Opt-in ja. |
+| I3 | Ungültiger Schlüssel → Status rot mit dem Text „Access denied — API key missing or invalid.“ (EN) bzw. dem deutschen Gegenstück. |
+| J1 | URL in einer unteren Endpunkt-Zeile tippen, dann das Schlüsselfeld anklicken: Eingabe übernommen, Scrollposition bleibt, Fokus liegt im Schlüsselfeld derselben Zeile. |
+| J2 | URL in einer unteren Endpunkt-Zeile tippen, dann neben das Feld tippen (kein Feld): Eingabe übernommen, Scrollposition bleibt, der Fokus springt nicht in ein Feld der ersten Zeile. |
 
 Jeder Punkt zählt in der CORE-TEST-19-Bilanz (grün/rot/übersprungen). 0 übersprungene sind
 Pflicht für ein vollständiges Ergebnis.
@@ -75,7 +89,7 @@ gebaut, ins Staging-Vault deployt, Lauf wiederholt — danach zurückgesetzt und
 verifiziert. Beide Läufe gegen dieselbe Zweitinstanz (Port 9395), Plugin vor jedem Lauf per
 `disablePlugin`/`enablePlugin` neu geladen.
 
-**Lage 1 — TTL = 30 000 ms (Normalzustand):** 9/9 grün, 0 übersprungen.
+**Lage 1 — TTL = 30 000 ms (Normalzustand):** 9/9 grün, 0 übersprungen (Stand der Gegenprobe: damals 9 Punkte; die Soll-Liste hat heute 22).
 
 **Lage 2 — TTL = 0 ms (Gegenprobe):** genau B3 kippt auf rot — alle anderen 8 Punkte bleiben
 grün. Detail des roten B3:
@@ -94,7 +108,7 @@ erfolgreiches Ergebnis statt `no-endpoint`. Der Punkt erwartet aber bewusst weit
 diese Erwartung nicht mehr, B3 wird rot. Das belegt: B3 misst tatsächlich das TTL-Verhalten des
 Reachability-Caches, nicht irgendein Zufallsergebnis.
 
-Zurückgesetzt auf `30_000`, neu gebaut, deployt, erneut 9/9 grün bestätigt (dritter Lauf).
+Zurückgesetzt auf `30_000`, neu gebaut, deployt, erneut 9/9 grün bestätigt (dritter Lauf, damaliger Umfang).
 
 ## Bekannte Randbedingungen
 
