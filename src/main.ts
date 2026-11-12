@@ -9,7 +9,7 @@ import { orphanSecretIds } from "./core/list-ops";
 import { loadSettings, newId, secretIdOf, toPersisted, type ManagedEndpoint, type ManagerSettings } from "./core/model";
 import { dropEmbeddingOnChatModels } from "./core/embedding-check";
 import { materialize } from "./core/reachability";
-import { listModels, loadModelKind, probeReachable } from "./obsidian/http";
+import { listModels, loadLmStudioModelKind, probeReachable } from "./obsidian/http";
 import { createShortcutsBridge, type ShortcutsBridge } from "./vendor/kit-obsidian/shortcuts-bridge";
 import { LlmEndpointManagerSettingTab } from "./obsidian/settings-tab";
 
@@ -49,14 +49,17 @@ export default class LlmEndpointManagerPlugin extends Plugin {
     this.app.workspace.onLayoutReady(() => { void this.dropEmbeddingOnChatModels(); });
   }
 
-  /** Einmal je Start: `embedding` an einer Zeile, deren Modell der Server als Chat-Modell nennt, ausschalten und es sagen (Welle 33,
-   *  Altlast des LM-Studio-Presets). Nur ein ausdrückliches „Chat-Modell" des Servers zählt; Zeilen ohne Antwort bleiben. Greift nur
-   *  zu, wenn die Zeile bei der Rückkehr der Antwort noch dasselbe Modell trägt. */
+  /** Einmal je Bestand (Marke `migrations.embeddingOnChatModels` in data.json): `embedding` an einer LM-Studio-Zeile, deren Modell der Server
+   *  ausdrücklich als Chat-Modell nennt, ausschalten und es sagen (Welle 33, Altlast des LM-Studio-Presets). Mit Marke läuft nichts mehr:
+   *  wer `embedding` danach bewusst wieder anhakt, behält es; der Editor-Hinweis bleibt. Die Marke kommt erst, wenn jede gefragte Zeile
+   *  geantwortet hat (ein schlafender LM Studio beim ersten Start heißt „noch nicht gelaufen"). Greift nur zu, wenn die Zeile bei der
+   *  Rückkehr der Antwort noch dasselbe Modell trägt. */
   private async dropEmbeddingOnChatModels(): Promise<void> {
+    if (this.settings.migrations?.embeddingOnChatModels) return;
     const token = (sid: string): string | null => this.secrets.get(sid);
     const r = await dropEmbeddingOnChatModels(this.settings.endpoints, (ep) => {
       const m = materialize(ep, token);
-      return "error" in m ? Promise.resolve("unknown") : loadModelKind(m.config, ep.provider);
+      return "error" in m ? Promise.resolve("unknown") : loadLmStudioModelKind(m.config, ep.provider);
     });
     const done: string[] = [];
     for (const after of r.endpoints) {
@@ -66,9 +69,10 @@ export default class LlmEndpointManagerPlugin extends Plugin {
       this.handle.invalidateUrl(live.url);
       done.push(live.label);
     }
-    if (done.length === 0) return;
+    if (!r.complete && done.length === 0) return;
+    if (r.complete) this.settings.migrations = { ...this.settings.migrations, embeddingOnChatModels: true };
     await this.saveSettings();
-    new Notice(t("notice.embeddingDropped", done.join(", ")), 20000);
+    if (done.length > 0) new Notice(t("notice.embeddingDropped", done.join(", ")), 20000);
   }
 
   /** Der EINZIGE Weg nach data.json — über toPersisted, nie mit apiKey. */

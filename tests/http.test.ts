@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, beforeAll, afterAll } from "vitest";
 import { requestUrl } from "obsidian";
-import { listModels, loadModelContext, probeHeaders, probeStatus } from "../src/obsidian/http";
+import { listModels, loadLmStudioModelKind, loadModelContext, probeHeaders, probeStatus } from "../src/obsidian/http";
 import { classifyEndpointStatus } from "../src/vendor/kit/endpoint_diagnostics";
 
 // Der vendorte Obsidian-Mock (tests/vendor/kit/obsidian-mock.ts) baut `requestUrl` mit einem
@@ -161,5 +161,39 @@ describe("loadModelContext", () => {
   it("Server nennt keine Zahl oder antwortet nicht: null, kein Wurf", async () => {
     rq.mockRejectedValue(new Error("ECONNREFUSED"));
     expect(await loadModelContext({ url: "http://h:1234", model: "m" }, "openai")).toBeNull();
+  });
+});
+
+describe("loadLmStudioModelKind (nur, was LM Studio ausdrücklich sagt)", () => {
+  const urls = (): string[] => rq.mock.calls.map((c) => (c[0] as { url: string }).url);
+  it("v1: type llm → chat, type embedding → embedding; fragt nie Ollamas /api/show", async () => {
+    rq.mockClear();
+    rq.mockImplementation(((arg: { url: string }) => Promise.resolve(arg.url.endsWith("/api/v1/models")
+      ? { status: 200, text: JSON.stringify({ models: [{ key: "q", type: "llm", loaded_instances: [] }, { key: "e", type: "embedding", loaded_instances: [] }] }) }
+      : { status: 404, text: "" })) as never);
+    expect(await loadLmStudioModelKind({ url: "http://h:1234/v1", model: "q" }, "openai")).toBe("chat");
+    expect(await loadLmStudioModelKind({ url: "http://h:1234", model: "e" }, "openai")).toBe("embedding");
+    expect(urls().some((u) => u.endsWith("/api/show"))).toBe(false);
+  });
+  it("v0 als zweite Route: type embeddings → embedding", async () => {
+    rq.mockImplementation(((arg: { url: string }) => Promise.resolve(arg.url.endsWith("/api/v0/models")
+      ? { status: 200, text: JSON.stringify({ data: [{ id: "e", type: "embeddings" }] }) }
+      : { status: 404, text: "" })) as never);
+    expect(await loadLmStudioModelKind({ url: "http://h:1234", model: "e" }, "openai")).toBe("embedding");
+  });
+  it("ein Ollama-Server (nur /api/show antwortet) bleibt unknown, auch bei einem Chat-Modell; Ollama-Zeilen und Zeilen ohne Modell werden gar nicht gefragt", async () => {
+    rq.mockClear();
+    rq.mockImplementation(((arg: { url: string }) => Promise.resolve(arg.url.endsWith("/api/show")
+      ? { status: 200, text: JSON.stringify({ capabilities: ["completion"] }) }
+      : { status: 404, text: "" })) as never);
+    expect(await loadLmStudioModelKind({ url: "http://h:11434", model: "llama3.2:3b" }, "openai")).toBe("unknown");
+    rq.mockClear();
+    expect(await loadLmStudioModelKind({ url: "http://h:11434", model: "llama3.2:3b" }, "ollama")).toBe("unknown");
+    expect(await loadLmStudioModelKind({ url: "http://h:1234" }, "openai")).toBe("unknown");
+    expect(rq.mock.calls.length).toBe(0);
+  });
+  it("kein Server: unknown, kein Wurf", async () => {
+    rq.mockRejectedValue(new Error("ECONNREFUSED"));
+    expect(await loadLmStudioModelKind({ url: "http://h:1234", model: "q" }, "openai")).toBe("unknown");
   });
 });

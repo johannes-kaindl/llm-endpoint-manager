@@ -97,4 +97,21 @@ describe("dropEmbeddingOnChatModels (Bestand beim Laden)", () => {
     expect(r2.dropped).toEqual(["A"]);
     expect(eps[0]?.capabilities).toEqual(["chat", "embedding"]);
   });
+  it("eine Ollama-Zeile behält embedding, auch wenn der Server „Chat“ meint: dort ist Chat nur aus der fehlenden Fähigkeit geschlossen, und es wird nicht einmal gefragt", async () => {
+    const asked: string[] = [];
+    const r = await dropEmbeddingOnChatModels([ep({ id: "oll", label: "Ollama", provider: "ollama", model: "llama3.2:3b" })], (e) => { asked.push(e.id); return Promise.resolve("chat"); });
+    expect(asked).toEqual([]);
+    expect(r.dropped).toEqual([]);
+    expect(r.endpoints[0]?.capabilities).toEqual(["chat", "embedding"]);
+    expect(r.complete).toBe(true);
+  });
+  it("complete: wahr, wenn jede gefragte Zeile geantwortet hat; ein stummer Server macht es falsch; nichts zu fragen ist vollständig", async () => {
+    const eps = [ep({ id: "a" }), ep({ id: "b", capabilities: ["chat"] })];
+    expect((await dropEmbeddingOnChatModels(eps, kinds({ a: "embedding" }))).complete).toBe(true);
+    expect((await dropEmbeddingOnChatModels(eps, kinds({ a: "chat" }))).complete).toBe(true);
+    expect((await dropEmbeddingOnChatModels(eps, kinds({ a: "unknown" }))).complete).toBe(false);
+    expect((await dropEmbeddingOnChatModels(eps, () => Promise.reject(new Error("weg")))).complete).toBe(false);
+    expect((await dropEmbeddingOnChatModels([], kinds({}))).complete).toBe(true);
+    expect((await dropEmbeddingOnChatModels([ep({ id: "c", capabilities: ["chat"] })], kinds({}))).complete).toBe(true);
+  });
 });

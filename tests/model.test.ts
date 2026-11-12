@@ -137,3 +137,16 @@ describe("Anbieter anthropic (Welle 23)", () => {
     expect([f.transport, f.backend]).toEqual(["shortcuts", "lmstudio"]);   // nur, was von anthropic stammt, fällt weg
   });
 });
+
+describe("Marke migrations.embeddingOnChatModels", () => {
+  it("bleibt über Laden und Speichern erhalten, fehlt bei fehlender Marke, und Unsinn wird verworfen", async () => {
+    const { loadSettings, toPersisted } = await import("../src/core/model");
+    const withMark = loadSettings({ endpoints: [], migrations: { embeddingOnChatModels: true } });
+    expect(withMark.migrations).toEqual({ embeddingOnChatModels: true });
+    expect(toPersisted(withMark).migrations).toEqual({ embeddingOnChatModels: true });
+    expect("migrations" in loadSettings({ endpoints: [] })).toBe(false);
+    expect("migrations" in toPersisted(loadSettings({ endpoints: [] }))).toBe(false);
+    expect("migrations" in loadSettings({ endpoints: [], migrations: { embeddingOnChatModels: "ja" } })).toBe(false);
+    expect("migrations" in loadSettings({ endpoints: [], migrations: 3 })).toBe(false);
+  });
+});

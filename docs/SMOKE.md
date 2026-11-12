@@ -1,8 +1,8 @@
 # GUI-Smoke — llm-endpoint-manager
 
-Faehrt die 26 Pruefpunkte (Soll-Liste `PUNKTE` im Treiber) gegen ein LAUFENDES Obsidian (CDP, CORE-TEST-02 b): Schluesselbund
+Faehrt die 28 Pruefpunkte (Soll-Liste `PUNKTE` im Treiber) gegen ein LAUFENDES Obsidian (CDP, CORE-TEST-02 b): Schluesselbund
 (A1-A5), API gegen einen im Treiber selbst laufenden Fake-Endpunkt (B1-B3), Restricted-Mode-
-Guard einer frischen Zweitinstanz (C1) und Aufräumprüfung (C2), Modellblock und Familie (D1-D3), Zusatzzeile (E1), Hilfe-Zeile (F1), Apple Intelligence (G1-G2), verwaiste Schlüssel (H1), Claude-API (I1-I3), Fokus und Scrollposition beim Neuzeichnen (J1-J2), Hinweis zu `embedding` an einem Chat-Modell (K1-K3). Treiber: `scripts/gui-smoke.ts`.
+Guard einer frischen Zweitinstanz (C1) und Aufräumprüfung (C2), Modellblock und Familie (D1-D3), Zusatzzeile (E1), Hilfe-Zeile (F1), Apple Intelligence (G1-G2), verwaiste Schlüssel (H1), Claude-API (I1-I3), Fokus und Scrollposition beim Neuzeichnen (J1-J2), Hinweis zu `embedding` an einem Chat-Modell (K1-K5). Treiber: `scripts/gui-smoke.ts`.
 
 ## Voraussetzung
 
@@ -63,6 +63,8 @@ greift (Obsidian haelt `main.js` sonst im Speicher).
 | K1 | `embedding` an einem Chat-Modell → roter Hinweis unter den Fähigkeiten mit dem Modellnamen; den Modelltyp nennt der Server (Fake-LM-Studio mit `llm` und `embedding`), nie der Name. |
 | K2 | `embedding` an einem Embedding-Modell desselben Servers → kein Hinweis; der Server wurde für beide Zeilen gefragt (Zahl der Anfragen an `/api/v1/models` im Detail). |
 | K3 | `embedding` an einem Modell, dessen Server nicht antwortet → gelber Hinweis „nicht prüfbar“, kein roter. |
+| K4 | Mit der Marke `migrations.embeddingOnChatModels` in den Einstellungen bleibt ein bewusst an einem Chat-Modell gesetztes `embedding` nach dem Neuladen des Plugins stehen (die Bereinigung läuft einmal je Bestand). |
+| K5 | Ohne Marke und ohne stummen Server nimmt das Plugin beim Neuladen `embedding` vom Chat-Modell (LM Studio sagt `llm`), das Embedding-Modell behält es, danach steht die Marke. |
 
 Jeder Punkt zählt in der CORE-TEST-19-Bilanz (grün/rot/übersprungen). 0 übersprungene sind
 Pflicht für ein vollständiges Ergebnis.
@@ -92,7 +94,7 @@ gebaut, ins Staging-Vault deployt, Lauf wiederholt — danach zurückgesetzt und
 verifiziert. Beide Läufe gegen dieselbe Zweitinstanz (Port 9395), Plugin vor jedem Lauf per
 `disablePlugin`/`enablePlugin` neu geladen.
 
-**Lage 1 — TTL = 30 000 ms (Normalzustand):** 9/9 grün, 0 übersprungen (Stand der Gegenprobe: damals 9 Punkte; die Soll-Liste hat heute 26).
+**Lage 1 — TTL = 30 000 ms (Normalzustand):** 9/9 grün, 0 übersprungen (Stand der Gegenprobe: damals 9 Punkte; die Soll-Liste hat heute 28).
 
 **Lage 2 — TTL = 0 ms (Gegenprobe):** genau B3 kippt auf rot — alle anderen 8 Punkte bleiben
 grün. Detail des roten B3:

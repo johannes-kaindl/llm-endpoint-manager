@@ -13,7 +13,7 @@ All notable changes to this project are documented here. The format follows
 ### Added
 
 - Settings, endpoint list: a row with the capability **embedding** now shows a note under the capabilities when its model is not an embedding model. Red: the server says the model is a chat model (a plugin asking for embeddings would be handed this endpoint and fail). Yellow: it cannot be checked (no model entered, server not answering). The model type comes from the server (LM Studio, Ollama), never from the name.
-- On start, **embedding** is switched off on every endpoint whose model the server names as a chat model, and a notice says which (older LM Studio endpoints created from the preset carried it). Endpoints the server does not answer for are left as they are; switch **embedding** on again in the settings if you changed the model.
+- Once per installation, on the first start, **embedding** is switched off on every LM Studio endpoint whose model LM Studio itself names as a chat model, and a notice says which (older endpoints created from the LM Studio preset carried it). A mark in `data.json` (`migrations.embeddingOnChatModels`) records that this ran; if you switch **embedding** on again later, it stays. Nothing is switched off on Ollama endpoints (Ollama embeds with most chat models; the red note under the capabilities is all it gets), and endpoints whose server does not answer are left as they are; the clean-up then runs again at the next start, until every endpoint has answered once.
 
 ### Fixed
 

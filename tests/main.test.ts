@@ -6,7 +6,7 @@ import LlmEndpointManagerPlugin from "../src/main";
 const kinds = vi.hoisted(() => ({ byModel: {} as Record<string, "chat" | "embedding" | "unknown">, asked: [] as string[] }));
 vi.mock("../src/obsidian/http", async (orig) => ({
   ...(await orig<typeof import("../src/obsidian/http")>()),
-  loadModelKind: (cfg: { model?: string }) => { kinds.asked.push(cfg.model ?? ""); return Promise.resolve(kinds.byModel[cfg.model ?? ""] ?? "unknown"); },
+  loadLmStudioModelKind: (cfg: { model?: string }) => { kinds.asked.push(cfg.model ?? ""); return Promise.resolve(kinds.byModel[cfg.model ?? ""] ?? "unknown"); },
 }));
 
 function plugin(data: unknown, app = makeFakeApp()): LlmEndpointManagerPlugin {
@@ -98,5 +98,45 @@ describe("LlmEndpointManagerPlugin", () => {
     await Promise.resolve();
     expect(kinds.asked).toEqual([]);
     expect((p as unknown as { __saved: unknown[] }).__saved).toEqual([]);
+  });
+  const lm = (over: Record<string, unknown> = {}) => ({ id: "lm", label: "LM Studio", url: "http://localhost:1234", provider: "openai", capabilities: ["chat", "embedding"], enabled: true, model: "qwen/qwen3.8-27b", ...over });
+  const savedOf = (p: LlmEndpointManagerPlugin) => (p as unknown as { __saved: Array<{ endpoints: Array<{ id: string; capabilities: string[] }>; migrations?: { embeddingOnChatModels?: boolean } }> }).__saved;
+  it("die Bereinigung läuft einmal je Bestand: danach steht die Marke in data.json, und ein bewusst wieder angehaktes embedding bleibt beim nächsten Start stehen", async () => {
+    kinds.byModel = { "qwen/qwen3.8-27b": "chat" }; kinds.asked = [];
+    const first = plugin({ endpoints: [lm()] });
+    await first.onload();
+    await vi.waitFor(() => expect(first.settings.endpoints[0]?.capabilities).toEqual(["chat"]));
+    await vi.waitFor(() => expect(savedOf(first).at(-1)?.migrations).toEqual({ embeddingOnChatModels: true }));
+    // Zweiter Start auf dem gespeicherten Bestand, nachdem der Nutzer embedding bewusst wieder eingeschaltet hat.
+    const stored = JSON.parse(JSON.stringify(savedOf(first).at(-1)));
+    stored.endpoints[0].capabilities = ["chat", "embedding"];
+    kinds.asked = [];
+    const second = plugin(stored);
+    await second.onload();
+    await Promise.resolve(); await Promise.resolve();
+    expect(kinds.asked).toEqual([]);
+    expect(second.settings.endpoints[0]?.capabilities).toEqual(["chat", "embedding"]);
+    expect(second.settings.migrations?.embeddingOnChatModels).toBe(true);
+  });
+  it("ohne Marke läuft die Bereinigung beim nächsten Start; ein schweigender Server verhindert die Marke und nimmt nichts weg", async () => {
+    kinds.byModel = {}; kinds.asked = [];
+    const p = plugin({ endpoints: [lm()] });
+    await p.onload();
+    await vi.waitFor(() => expect(kinds.asked).toEqual(["qwen/qwen3.8-27b"]));
+    await Promise.resolve(); await Promise.resolve();
+    expect(p.settings.endpoints[0]?.capabilities).toEqual(["chat", "embedding"]);
+    expect(p.settings.migrations?.embeddingOnChatModels).toBeUndefined();
+    expect(savedOf(p)).toEqual([]);
+  });
+  it("eine Ollama-Zeile behält embedding und wird nicht gefragt; ein frischer Bestand ohne Zeilen bekommt die Marke sofort", async () => {
+    kinds.byModel = { "llama3.2:3b": "chat" }; kinds.asked = [];
+    const o = plugin({ endpoints: [lm({ id: "oll", label: "Ollama", provider: "ollama", url: "http://localhost:11434", model: "llama3.2:3b" })] });
+    await o.onload();
+    await vi.waitFor(() => expect(o.settings.migrations?.embeddingOnChatModels).toBe(true));
+    expect(kinds.asked).toEqual([]);
+    expect(o.settings.endpoints[0]?.capabilities).toEqual(["chat", "embedding"]);
+    const fresh = plugin({ endpoints: [] });
+    await fresh.onload();
+    await vi.waitFor(() => expect(fresh.settings.migrations?.embeddingOnChatModels).toBe(true));
   });
 });

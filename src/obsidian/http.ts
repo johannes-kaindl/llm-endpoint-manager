@@ -5,7 +5,7 @@ import { normalizeEndpoint } from "../vendor/kit/endpoint";
 import { authHeaders, type EndpointConfig } from "../vendor/kit/endpoint_config";
 import { ANTHROPIC_VERSION } from "../vendor/kit/anthropic-wire";
 import { withTimeout } from "../vendor/kit/timeout";
-import { fetchModelKind, probeBaseUrl, type CapabilityFetch, type ModelKind } from "../vendor/kit/capabilities";
+import { fetchModelKind, parseModelKind, probeBaseUrl, type CapabilityFetch, type ModelKind } from "../vendor/kit/capabilities";
 import { fetchModelContext, type ModelContext } from "../vendor/kit/model-context";
 import { providerProbe } from "../core/provider";
 import type { Provider } from "../core/model";
@@ -132,4 +132,21 @@ export function loadModelKind(cfg: EndpointConfig, provider: Provider): Promise<
   if ((provider !== "openai" && provider !== "ollama") || model === "") return Promise.resolve("unknown");
   const auth = authHeaders(cfg.apiKey);
   return fetchModelKind((req) => capabilityFetch({ ...req, headers: { ...auth, ...(req.headers ?? {}) } }), probeBaseUrl(cfg.url), model);
+}
+
+/** Wie `loadModelKind`, aber nur, was LM Studio ausdrücklich sagt (`type` in `/api/v1/models`, dann `/api/v0/models`): kein Ollama-`/api/show`,
+ *  dessen „Chat" aus einer fehlenden Fähigkeit geschlossen ist. Grundlage der Bestandsbereinigung beim Start, die nur auf eine ausdrückliche
+ *  Aussage hin etwas wegnimmt. Nur `openai`-Zeilen mit einem Modell; wirft nie. */
+export async function loadLmStudioModelKind(cfg: EndpointConfig, provider: Provider): Promise<ModelKind> {
+  const model = cfg.model?.trim() ?? "";
+  if (provider !== "openai" || model === "") return "unknown";
+  const auth = authHeaders(cfg.apiKey);
+  const base = probeBaseUrl(cfg.url);
+  for (const [path, flavor] of [["/api/v1/models", "lmstudio-v1"], ["/api/v0/models", "lmstudio-v0"]] as const) {
+    try {
+      const r = await capabilityFetch({ url: `${base}${path}`, headers: { ...auth } });
+      if (r) { const kind = parseModelKind(r.json, model, flavor); if (kind !== "unknown") return kind; }
+    } catch { /* nächste Route */ }
+  }
+  return "unknown";
 }

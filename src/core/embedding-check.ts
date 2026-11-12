@@ -22,21 +22,24 @@ export function embeddingVerdict(ep: Pick<ManagedEndpoint, "capabilities" | "pro
 }
 
 /** Bestand beim Laden: nimmt `embedding` von jeder Zeile, deren Modell der Server als Chat-Modell nennt (Welle 33: das LM-Studio-
- *  Preset setzte `embedding` neben ein Chat-Modell, und `resolve("embedding")` gab es ohne Frage aus). Nur ein ausdrückliches `chat`
- *  zählt; alles Ungewisse bleibt, wie es ist. Fragt nur, wo eine Antwort möglich ist. Ändert die Eingabe nicht. */
+ *  Preset setzte `embedding` neben ein Chat-Modell, und `resolve("embedding")` gab es ohne Frage aus). Gilt nur für `openai`-Zeilen:
+ *  LM Studio nennt den Typ ausdrücklich, bei Ollama ist „Chat" nur aus der fehlenden Fähigkeit `embedding` in `/api/show` geschlossen,
+ *  und Ollama bettet mit den meisten Chat-Modellen ein — dort nimmt nichts etwas weg (der Editor-Hinweis genügt). Nur ein ausdrückliches
+ *  `chat` zählt; alles Ungewisse bleibt. `complete`: jede gefragte Zeile hat eine Antwort bekommen (dann darf die Bereinigung als
+ *  erledigt markiert werden; ein stummer Server heißt „noch nicht gelaufen"). Ändert die Eingabe nicht. */
 export async function dropEmbeddingOnChatModels(
   endpoints: readonly ManagedEndpoint[],
   kindOf: (ep: ManagedEndpoint) => Promise<ModelKind>,
-): Promise<{ endpoints: ManagedEndpoint[]; dropped: string[] }> {
-  // Parallel: ein schlafender Server mit drei Zeitüberschreitungen soll die anderen Zeilen nicht aufhalten.
-  const kinds = await Promise.all(endpoints.map((ep) => (ep.capabilities.includes("embedding") && modelKindAskable(ep)
-    ? kindOf(ep).catch((): ModelKind => "unknown")
-    : Promise.resolve<ModelKind>("unknown"))));
+): Promise<{ endpoints: ManagedEndpoint[]; dropped: string[]; complete: boolean }> {
+  const considered = (ep: ManagedEndpoint): boolean => ep.provider === "openai" && ep.capabilities.includes("embedding") && modelKindAskable(ep);
+  // Parallel: ein schlafender Server mit Zeitüberschreitungen soll die anderen Zeilen nicht aufhalten.
+  const kinds = await Promise.all(endpoints.map((ep) => (considered(ep) ? kindOf(ep).catch((): ModelKind => "unknown") : Promise.resolve<ModelKind>("unknown"))));
   const dropped: string[] = [];
   const out = endpoints.map((ep, i) => {
-    if (embeddingVerdict(ep, kinds[i]) !== "mismatch") return ep;
+    if (!considered(ep) || kinds[i] !== "chat") return ep;
     dropped.push(ep.label);
     return { ...ep, capabilities: ep.capabilities.filter((c) => c !== "embedding") };
   });
-  return { endpoints: out, dropped };
+  const complete = endpoints.every((ep, i) => !considered(ep) || kinds[i] !== "unknown");
+  return { endpoints: out, dropped, complete };
 }

@@ -73,6 +73,8 @@ const PUNKTE = [
   "K1 embedding an einem Chat-Modell → roter Hinweis unter den Fähigkeiten mit dem Modellnamen (Modelltyp vom Server, Fake-LM-Studio mit llm und embedding)",
   "K2 embedding an einem Embedding-Modell desselben Servers → kein Hinweis (und der Server wurde für beide Zeilen gefragt)",
   "K3 embedding an einem Modell, dessen Server nicht antwortet → gelber Hinweis „nicht prüfbar“, kein roter",
+  "K4 Mit Marke in data.json: ein bewusst an einem Chat-Modell gesetztes embedding bleibt nach dem Neuladen des Plugins stehen (die Bereinigung läuft einmal je Bestand)",
+  "K5 Ohne Marke und ohne stummen Server: nach dem Neuladen nimmt das Plugin embedding vom Chat-Modell (LM Studio sagt llm), das Embedding-Modell behält es, die Marke steht danach",
 ] as const;
 const { record, abschluss } = createBilanz({ punkte: PUNKTE });
 
@@ -885,6 +887,32 @@ async function main(): Promise<void> {
       "K3 embedding an einem Modell, dessen Server nicht antwortet → gelber Hinweis „nicht prüfbar“, kein roter",
       kDead !== null && kDead.cls.includes("is-unverified") && !kDead.cls.includes("is-mismatch") && /Could not check|nicht prüfen/.test(kDead.text),
       JSON.stringify(kDead),
+    );
+    // K4/K5 — Bestandsbereinigung beim Start (Marke `migrations.embeddingOnChatModels`). Gegen denselben Fake-LM-Studio wie K1-K3.
+    const kState = `(() => { const p = app.plugins.plugins[${q(PLUGIN_ID)}]; const by = (id) => p.settings.endpoints.find((e) => e.id === id); return { marker: p.settings.migrations ? p.settings.migrations.embeddingOnChatModels === true : false, chat: by(${q(kIds.chat)}) ? by(${q(kIds.chat)}).capabilities : null, emb: by(${q(kIds.emb)}) ? by(${q(kIds.emb)}).capabilities : null, dead: Boolean(by(${q(kIds.dead)})) }; })()`;
+    const kReload = `await app.plugins.disablePlugin(${q(PLUGIN_ID)}); await app.plugins.enablePlugin(${q(PLUGIN_ID)}); await new Promise((r) => setTimeout(r, 3000));`;
+    const k4Vorher = await cdp.evaluate<{ marker: boolean; chat: string[] | null }>(`return ${kState};`);
+    const k4Nachher = await cdp.evaluate<{ marker: boolean; chat: string[] | null }>(`${kReload} return ${kState};`);
+    record(
+      "K4 Mit Marke in data.json: ein bewusst an einem Chat-Modell gesetztes embedding bleibt nach dem Neuladen des Plugins stehen (die Bereinigung läuft einmal je Bestand)",
+      k4Vorher.marker && k4Vorher.chat !== null && k4Vorher.chat.includes("embedding") && k4Nachher.marker && (k4Nachher.chat ?? []).includes("embedding"),
+      JSON.stringify({ k4Vorher, k4Nachher }),
+    );
+    // Marke weg, den stummen Server (K3) entfernen: jetzt ist die Bereinigung vollständig und läuft.
+    await cdp.evaluate(`
+      const p = app.plugins.plugins[${q(PLUGIN_ID)}];
+      p.settings.endpoints = p.settings.endpoints.filter((e) => e.id !== ${q(kIds.dead)});
+      delete p.settings.migrations;
+      await p.saveSettings();
+      return true;
+    `);
+    await cdp.evaluate(`${kReload} return true;`);
+    const k5 = await pollUntil<{ marker: boolean; chat: string[] | null; emb: string[] | null }>(cdp, `const st = ${kState}; return st.marker && st.chat && !st.chat.includes("embedding") ? st : null;`, 15000, 500);
+    const k5Ende = await cdp.evaluate<{ marker: boolean; chat: string[] | null; emb: string[] | null }>(`return ${kState};`);
+    record(
+      "K5 Ohne Marke und ohne stummen Server: nach dem Neuladen nimmt das Plugin embedding vom Chat-Modell (LM Studio sagt llm), das Embedding-Modell behält es, die Marke steht danach",
+      k5 !== null && k5Ende.marker && !(k5Ende.chat ?? []).includes("embedding") && (k5Ende.emb ?? []).includes("embedding"),
+      JSON.stringify({ k5, k5Ende }),
     );
     await kindServer.close();
     kindServer = null;

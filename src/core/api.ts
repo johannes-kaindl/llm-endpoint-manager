@@ -111,7 +111,9 @@ export function createManagerApi(deps: ApiDeps): ManagerApiHandle {
       // replaceSettings scheitert). `obsidianSecretStore.set` wirft absichtlich bei einem Schlüsselbund,
       // der den Wert nicht persistiert; ein Konsument, der laut Vertrag "error" in result statt
       // try/catch prüft, darf das nie als unbehandelte Rejection sehen.
-      await deps.replaceSettings(toPersisted({ version: 1, endpoints: out.endpoints }));
+      // Die Marken einmaliger Bereinigungen gehören zum Bestand und überleben den Import (sonst liefe die Bereinigung beim nächsten Start erneut).
+      const marks = deps.settings().migrations;
+      await deps.replaceSettings(toPersisted({ version: 1, endpoints: out.endpoints, ...(marks ? { migrations: marks } : {}) }));
       for (const e of out.endpoints) { reachability.invalidate(e.url); models.invalidate(normalizeEndpoint(e.url)); }
       // Erst NACH dem Secret-Schreiben melden: ein synchroner „changed“-Listener, der sofort
       // `list()`/`get()` ruft, soll `hasSecret` des gerade importierten Endpunkts schon sehen.

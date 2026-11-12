@@ -222,6 +222,15 @@ describe("Claude-Endpunkt hinter dem Opt-in (Welle 23)", () => {
   });
 });
 
+describe("importEndpoints und die Bereinigungsmarke", () => {
+  it("die Marke migrations.embeddingOnChatModels überlebt einen Import", async () => {
+    const { d, replaceSettings } = deps({ ...base(), migrations: { embeddingOnChatModels: true } });
+    const { api } = createManagerApi(d);
+    await api.importEndpoints([{ url: "http://neu:1234" }], "chat");
+    expect(replaceSettings.mock.calls.at(-1)?.[0].migrations).toEqual({ embeddingOnChatModels: true });
+  });
+});
+
 describe("api-types Re-Export", () => {
   it("LLM_ENDPOINT_MANAGER_API_VERSION kommt aus dem gevendorten Kit-Modul — eine Quelle", () => {
     expect(LLM_ENDPOINT_MANAGER_API_VERSION).toBe(1);

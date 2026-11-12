@@ -49,9 +49,13 @@ export const DEFAULT_SHORTCUT_NAME = "Ask On-Device Model (Obsidian)";
  *  30 s Marge für Guardrail-Prüfung und langsamere Geräte. */
 export const DEFAULT_SHORTCUT_TIMEOUT_MS = 30_000;
 
+/** Marken einmaliger Bereinigungen des Bestands: ohne Marke läuft die Bereinigung, mit Marke nie wieder (wer danach bewusst etwas wieder einschaltet, verliert es nicht beim nächsten Start). */
+export interface SettingsMigrations { embeddingOnChatModels?: boolean }
+
 export interface ManagerSettings {
   version: 1;
   endpoints: ManagedEndpoint[];
+  migrations?: SettingsMigrations;
 }
 
 export const DEFAULT_SETTINGS: ManagerSettings = { version: 1, endpoints: [] };
@@ -182,7 +186,9 @@ export function loadSettings(raw: unknown, mint: () => string = newId): ManagerS
   const merged = mergeSettings(DEFAULT_SETTINGS, raw) as { endpoints?: unknown };
   const list = Array.isArray(merged.endpoints) ? merged.endpoints : [];
   const endpoints = list.map((e) => normalizeEndpointEntry(e, mint)).filter((e): e is ManagedEndpoint => e !== null);
-  return { version: 1, endpoints };
+  const marks = (merged as { migrations?: unknown }).migrations;
+  const done = typeof marks === "object" && marks !== null && (marks as SettingsMigrations).embeddingOnChatModels === true;
+  return done ? { version: 1, endpoints, migrations: { embeddingOnChatModels: true } } : { version: 1, endpoints };
 }
 
 /** Der EINZIGE Weg nach data.json: baut jeden Eintrag neu auf, ohne `apiKey`. */
@@ -194,5 +200,6 @@ export function toPersisted(s: ManagerSettings): ManagerSettings {
       void _drop;
       return { ...rest, capabilities: [...new Set(e.capabilities)] };
     }),
+    ...(s.migrations?.embeddingOnChatModels ? { migrations: { embeddingOnChatModels: true } } : {}),
   };
 }
