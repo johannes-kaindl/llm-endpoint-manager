@@ -1,6 +1,6 @@
 # GUI-Smoke — llm-endpoint-manager
 
-Faehrt die 22 Pruefpunkte (Soll-Liste `PUNKTE` im Treiber) gegen ein LAUFENDES Obsidian (CDP, CORE-TEST-02 b): Schluesselbund
+Faehrt die 23 Pruefpunkte (Soll-Liste `PUNKTE` im Treiber) gegen ein LAUFENDES Obsidian (CDP, CORE-TEST-02 b): Schluesselbund
 (A1-A5), API gegen einen im Treiber selbst laufenden Fake-Endpunkt (B1-B3), Restricted-Mode-
 Guard einer frischen Zweitinstanz (C1) und Aufräumprüfung (C2), Modellblock und Familie (D1-D3), Zusatzzeile (E1), Hilfe-Zeile (F1), Apple Intelligence (G1-G2), verwaiste Schlüssel (H1), Claude-API (I1-I3), Fokus und Scrollposition beim Neuzeichnen (J1-J2). Treiber: `scripts/gui-smoke.ts`.
 
@@ -89,7 +89,7 @@ gebaut, ins Staging-Vault deployt, Lauf wiederholt — danach zurückgesetzt und
 verifiziert. Beide Läufe gegen dieselbe Zweitinstanz (Port 9395), Plugin vor jedem Lauf per
 `disablePlugin`/`enablePlugin` neu geladen.
 
-**Lage 1 — TTL = 30 000 ms (Normalzustand):** 9/9 grün, 0 übersprungen (Stand der Gegenprobe: damals 9 Punkte; die Soll-Liste hat heute 22).
+**Lage 1 — TTL = 30 000 ms (Normalzustand):** 9/9 grün, 0 übersprungen (Stand der Gegenprobe: damals 9 Punkte; die Soll-Liste hat heute 23).
 
 **Lage 2 — TTL = 0 ms (Gegenprobe):** genau B3 kippt auf rot — alle anderen 8 Punkte bleiben
 grün. Detail des roten B3:
