@@ -56,6 +56,14 @@ export function autoResolvable(ep: ManagedEndpoint, transports?: EndpointTranspo
   return (transports ?? ["http"]).includes(own);
 }
 
+/** Welche Einträge `materialize(id)` herausgibt. Die ausdrückliche ID-Wahl umgeht die Reihenfolge von `resolve()`, nicht den
+ *  Opt-in: ohne `transports` bekommt der Aufrufer `http` und `shortcuts` (wie bisher), den Claude-Endpunkt nicht. Ein älteres
+ *  Plugin mit einer gespeicherten `endpointId`, die auf ihn zeigt, bekäme sonst eine Konfiguration, die sein Chat-Client nicht
+ *  spricht (Welle 33; `list()` und `resolve()` filtern seit Welle 23). Mit `transports` zählt genau diese Liste. */
+export function materializable(ep: ManagedEndpoint, transports?: EndpointTransport[]): boolean {
+  return (transports ?? ["http", "shortcuts"]).includes(ep.transport ?? "http");
+}
+
 /** Erster erreichbarer, aktivierter Eintrag mit der Fähigkeit, in Listenreihenfolge. Einträge mit
  *  fehlendem Token werden still übersprungen (kein Fehler — der Manager zeigt sie im Tab an). */
 /** `resolve()` des öffentlichen Vertrags kennt kein `transports`-Opt-in (anders als `list()`) —

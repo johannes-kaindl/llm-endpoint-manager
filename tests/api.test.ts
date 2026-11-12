@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { createManagerApi, type ApiDeps } from "../src/core/api";
 import { loadSettings, type ManagerSettings } from "../src/core/model";
 import { MemorySecretStore } from "../src/vendor/kit/secrets";
-import { LLM_ENDPOINT_MANAGER_API_VERSION } from "../src/core/api-types";
+import { LLM_ENDPOINT_MANAGER_API_VERSION, type EndpointTransport } from "../src/core/api-types";
 import { isLlmEndpointManagerApi } from "../src/vendor/kit/endpoint-source";
 
 function deps(initial: ManagerSettings, over: Partial<ApiDeps> = {}) {
@@ -15,6 +15,8 @@ function deps(initial: ManagerSettings, over: Partial<ApiDeps> = {}) {
   const d: ApiDeps = { settings: () => settings, replaceSettings, secrets, probe, listModels, now: () => 0, mint: () => `id${++n}`, ...over };
   return { d, secrets, replaceSettings, probe, listModels, current: () => settings };
 }
+/** Das Kit reicht `transports` an `materialize` durch, die vendorte Schnittstelle nennt nur `caller`: Übergabe über eine Variable, nicht als Literal. */
+const opt = (transports: EndpointTransport[]): { caller?: string } => ({ transports } as { caller?: string });
 const base = () => loadSettings({ endpoints: [
   { id: "a", label: "A", url: "http://a", capabilities: ["chat"] },
   { id: "b", label: "B", url: "http://b", capabilities: ["embedding", "chat"], model: "m-b", secretId: "llm-endpoint-manager-b" },
@@ -187,14 +189,30 @@ describe("Claude-Endpunkt hinter dem Opt-in (Welle 23)", () => {
     expect(r.map((e) => e.id)).toEqual(["c", "a"]);
     expect(r[0]).toMatchObject({ provider: "anthropic", transport: "anthropic", backend: "anthropic", defaultModel: "claude-haiku-5-5" });
   });
-  it("resolve() ohne Opt-in nimmt den lokalen, mit transports den Claude-Endpunkt; materialize(id) geht immer", async () => {
+  it("resolve() ohne Opt-in nimmt den lokalen, mit transports den Claude-Endpunkt; materialize(id) nur mit demselben Opt-in", async () => {
     const { d, secrets } = deps(withClaude());
     secrets.set("llm-endpoint-manager-c", "sk-ant-x");
     const { api } = createManagerApi(d);
     expect((await api.resolve("chat") as { id: string }).id).toBe("a");
     const r = await api.resolve("chat", { transports: ["http", "anthropic"] }) as { id: string; transport?: string; backend?: string; config: { apiKey?: string } };
     expect([r.id, r.transport, r.backend, r.config.apiKey]).toEqual(["c", "anthropic", "anthropic", "sk-ant-x"]);
-    expect((await api.materialize("c") as { id: string }).id).toBe("c");
+    expect((await api.materialize("c", opt(["http", "anthropic"])) as { id: string }).id).toBe("c");
+  });
+  it("materialize(id) ohne Opt-in gibt den Claude-Endpunkt nicht heraus, auch nicht mit gesetztem Token und gültiger ID (ein älteres Plugin mit gespeicherter endpointId)", async () => {
+    const { d, secrets } = deps(withClaude());
+    secrets.set("llm-endpoint-manager-c", "sk-ant-x");
+    const { api } = createManagerApi(d);
+    expect(await api.materialize("c")).toEqual({ error: "not-found" });
+    expect(await api.materialize("c", { caller: "altes-plugin" })).toEqual({ error: "not-found" });
+    expect(await api.materialize("c", opt(["http"]))).toEqual({ error: "not-found" });
+    expect(JSON.stringify(await api.materialize("c"))).not.toContain("sk-ant-x");
+  });
+  it("materialize(id) mit Opt-in auf einen http-Endpunkt bleibt wie bisher; transports:[anthropic] allein schließt http aus", async () => {
+    const { d } = deps(withClaude());
+    const { api } = createManagerApi(d);
+    expect((await api.materialize("a") as { id: string }).id).toBe("a");
+    expect((await api.materialize("a", opt(["http", "anthropic"])) as { id: string }).id).toBe("a");
+    expect(await api.materialize("a", opt(["anthropic"]))).toEqual({ error: "not-found" });
   });
   it("ein Fremdplugin ohne Opt-in bekommt auch ohne Token keine Spur: resolve überspringt ihn still (no-endpoint, wenn nichts bleibt)", async () => {
     const s = loadSettings({ endpoints: [{ id: "c", label: "Claude", url: "https://api.anthropic.com", provider: "anthropic", capabilities: ["chat"] }] });

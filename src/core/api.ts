@@ -2,11 +2,15 @@ import { createModelListCache } from "../vendor/kit/model-list-cache";
 import type { SecretStore } from "../vendor/kit/secrets";
 import type { EndpointConfig } from "../vendor/kit/endpoint_config";
 import { normalizeEndpoint } from "../vendor/kit/endpoint";
-import { LLM_ENDPOINT_MANAGER_API_VERSION, type ApiEndpoint, type ApiError, type ImportResult, type LlmEndpointManagerApi, type ResolvedEndpoint } from "./api-types";
+import { LLM_ENDPOINT_MANAGER_API_VERSION, type ApiEndpoint, type ApiError, type EndpointTransport, type ImportResult, type LlmEndpointManagerApi, type ResolvedEndpoint } from "./api-types";
 import { byTransport } from "./list-ops";
 import { byCapability, importEndpoints } from "./list-ops";
 import { toPersisted, type Capability, type ManagedEndpoint, type ManagerSettings, type Provider } from "./model";
-import { createReachabilityCache, materialize, resolveFirst, type Materialized, type ReachabilityCache } from "./reachability";
+import { createReachabilityCache, materializable, materialize, resolveFirst, type Materialized, type ReachabilityCache } from "./reachability";
+
+/** Das Kit-Gegenstück (`resolveEndpointSource`, `embedding-connection`) reicht `transports` auch an `materialize` durch; die vendorte
+ *  Schnittstellenzeile nennt nur `caller`. */
+type MaterializeOpts = { caller?: string; transports?: EndpointTransport[] };
 
 export interface CallerRecord { caller: string; capability?: Capability; at: number }
 const CALLER_RING = 50;
@@ -78,10 +82,11 @@ export function createManagerApi(deps: ApiDeps): ManagerApiHandle {
       const r = await resolveFirst(deps.settings().endpoints, capability, reachability, safeProbe, token, opts?.transports);
       return "error" in r ? r : toResolved(r);
     },
-    async materialize(id, opts) {
+    async materialize(id, opts?: MaterializeOpts) {
       record(opts?.caller);
       const e = find(id);
-      if (!e) return { error: "not-found" };
+      // Ein Endpunkt, den der Aufrufer nicht sprechen will (oder dessen Transport er nie angefordert hat), ist für ihn nicht da.
+      if (!e || !materializable(e, opts?.transports)) return { error: "not-found" };
       const m = materialize(e, token);
       return "error" in m ? m : toResolved(m);
     },
