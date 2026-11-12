@@ -39,7 +39,7 @@ greift (Obsidian haelt `main.js` sonst im Speicher).
 |---|---|
 | C1 | Restricted-Mode-Guard: `app.plugins.setEnable(true)` schaltet ein frisches Profil frei, danach ist das Plugin geladen. |
 | A1 | Settings-Tab öffnet, Abschnitt „LLM-Endpunkte" vorhanden, Adder-Zeile leer. |
-| A2 | Preset „LM Studio" klicken → Zeile `http://localhost:1234`, Provider `openai`, Fähigkeiten chat/vision/embedding gesetzt. |
+| A2 | Preset „LM Studio" klicken → Zeile `http://localhost:1234`, Provider `openai`, Fähigkeiten chat/vision gesetzt, kein `embedding` (seit Welle 33). |
 | A3 | Token `sk-test` setzen → `app.secretStorage.getSecret(secretId)` liefert `sk-test`, `data.json` im Vault enthält kein `sk-test`, Zeile zeigt „Token gespeichert" (DE) / „token saved" (EN). |
 | A4 | Token entfernen (Knopf per `aria-label` getroffen, nicht Position) → Secret ist leer, Zeile zeigt wieder ein Passwortfeld. |
 | A5 | Endpunkt entfernen → Secret ist leer, Endpunktliste leer. |

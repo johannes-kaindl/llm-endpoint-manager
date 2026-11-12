@@ -59,7 +59,8 @@ export interface ProviderPreset {
 }
 
 export const PRESETS: readonly ProviderPreset[] = [
-  { label: "LM Studio", url: "http://localhost:1234", provider: "openai", capabilities: ["chat", "vision", "embedding"] },
+  // Kein `embedding`: ein Endpunkt trägt ein Standardmodell, und das ist bei LM Studio ein Chat-Modell (Welle 33). Wer Embeddings will, legt einen eigenen Endpunkt mit dem Embedding-Modell an.
+  { label: "LM Studio", url: "http://localhost:1234", provider: "openai", capabilities: ["chat", "vision"] },
   { label: "Ollama", url: "http://localhost:11434", provider: "ollama", capabilities: ["chat", "embedding"] },
   { label: "OpenAI-compatible cloud", labelKey: "preset.cloud", url: "https://", provider: "openai", capabilities: ["chat"] },
   {
@@ -72,6 +73,9 @@ export const PRESETS: readonly ProviderPreset[] = [
     transport: "anthropic", backend: "anthropic",
   },
 ];
+
+/** Frühere Vorgaben eines Presets, die ältere Zeilen noch tragen (bis Welle 33 setzte LM Studio auch `embedding`): eine Liste, die noch genau so steht, hat der Nutzer nie angefasst. */
+const FORMER_PRESET_CAPABILITIES: readonly (readonly Capability[])[] = [["chat", "vision", "embedding"]];
 
 const IMAGE_PROVIDERS: readonly Provider[] = ["a1111", "comfy"];
 
@@ -86,6 +90,6 @@ function sameSet(a: readonly Capability[], b: readonly Capability[]): boolean {
 export function capabilitiesForProvider(caps: readonly Capability[], provider: Provider): Capability[] {
   if (!IMAGE_PROVIDERS.includes(provider)) return [...caps];
   if (caps.includes("image")) return [...caps];
-  if (caps.length === 0 || PRESETS.some((p) => sameSet(p.capabilities, caps))) return ["image"];
+  if (caps.length === 0 || PRESETS.some((p) => sameSet(p.capabilities, caps)) || FORMER_PRESET_CAPABILITIES.some((c) => sameSet(c, caps))) return ["image"];
   return [...caps, "image"];
 }

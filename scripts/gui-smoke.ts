@@ -50,7 +50,7 @@ const PUNKTE = [
   "C1 Restricted-Mode-Guard (Plugin nach setEnable geladen)",
   "C2 Keine liegen gebliebenen Test-Endpunkte aus einem abgebrochenen Vorlauf",
   "A1 Settings-Tab offen, Adder-Zeile leer",
-  "A2 Preset LM Studio → Zeile localhost:1234, openai, chat/vision/embedding",
+  "A2 Preset LM Studio → Zeile localhost:1234, openai, chat/vision, KEIN embedding",
   "A3 Token setzen → secretStorage=sk-test, data.json ohne sk-test, Zeile „Token gespeichert“",
   "A4 Token entfernen → Secret null, Zeile zeigt Passwortfeld",
   "A5 Endpunkt entfernen → Secret null, Liste leer",
@@ -304,9 +304,9 @@ async function main(): Promise<void> {
       const e = app.plugins.plugins[${q(PLUGIN_ID)}].settings.endpoints[0];
       return e ? { url: e.url, provider: e.provider, caps: [...e.capabilities].sort(), id: e.id } : null;
     `);
-    const capsOk = ep0 !== null && JSON.stringify(ep0.caps) === JSON.stringify(["chat", "embedding", "vision"]);
+    const capsOk = ep0 !== null && JSON.stringify(ep0.caps) === JSON.stringify(["chat", "vision"]);
     record(
-      "A2 Preset LM Studio → Zeile localhost:1234, openai, chat/vision/embedding",
+      "A2 Preset LM Studio → Zeile localhost:1234, openai, chat/vision, KEIN embedding",
       presetOk && nachPreset !== null && ep0?.url === "http://localhost:1234" && ep0.provider === "openai" && capsOk,
       `Klick=${presetOk}, Zeile=${JSON.stringify(ep0)}`,
     );

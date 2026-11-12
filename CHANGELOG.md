@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- Settings, presets: the **LM Studio** preset no longer switches on the capability **embedding**. An endpoint holds one default model, and for LM Studio that is a chat model, so a plugin asking for an embedding endpoint was handed the chat model and got "No models loaded". Endpoints you already created keep their capabilities; switch **embedding** off there, or add a separate endpoint with an embedding model such as `text-embedding-nomic-embed-text-v1.5`.
+
 ### Fixed
 
 - API, `materialize(id)`: an endpoint that speaks another wire format (the Claude endpoint) is no longer handed out to a plugin that did not ask for it in `transports`, even when it names the endpoint by id; the call answers `not-found`, like `list()` and `resolve()` already do. A plugin that opts in (`transports: ["http", "anthropic"]`) gets it as before.

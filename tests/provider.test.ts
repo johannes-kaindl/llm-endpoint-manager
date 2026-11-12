@@ -32,9 +32,12 @@ describe("providerProbe", () => {
   it("apple-shortcuts hat KEINEN HTTP-Pfad", () => {
     expect(providerProbe("apple-shortcuts")).toBeNull();
   });
+  it("kein Preset setzt embedding neben einem Chat-Modell (LM Studio trägt ein Chat-Standardmodell)", () => {
+    expect(PRESETS.find((p) => p.label === "LM Studio")?.capabilities).not.toContain("embedding");
+  });
   it("Presets tragen Provider und Fähigkeiten", () => {
     expect(PRESETS.map(p => [p.label, p.provider, p.capabilities])).toEqual([
-      ["LM Studio", "openai", ["chat", "vision", "embedding"]],
+      ["LM Studio", "openai", ["chat", "vision"]],
       ["Ollama", "ollama", ["chat", "embedding"]],
       ["OpenAI-compatible cloud", "openai", ["chat"]],
       ["Apple Intelligence (on-device)", "apple-shortcuts", ["chat"]],
@@ -68,6 +71,9 @@ describe("capabilitiesForProvider — Wechsel auf ein Bild-Protokoll", () => {
     expect(capabilitiesForProvider(["chat", "vision", "embedding"], "a1111")).toEqual(["image"]);
     expect(capabilitiesForProvider(["embedding", "chat"], "comfy")).toEqual(["image"]);
     expect(capabilitiesForProvider(["chat"], "a1111")).toEqual(["image"]);
+  });
+  it("die frühere LM-Studio-Vorgabe (chat, vision, embedding) in einer älteren Zeile gilt weiter als unangefasst", () => {
+    expect(capabilitiesForProvider(["embedding", "vision", "chat"], "a1111")).toEqual(["image"]);
   });
   it("leere Liste → image", () => {
     expect(capabilitiesForProvider([], "a1111")).toEqual(["image"]);
