@@ -10,6 +10,8 @@ The plugin has no view of its own, so every image shows its settings tab. Since 
 
 **2026-11-12: `hero.png` and `endpoints.png` recorded again** (Obsidian 1.15.1, same setup) because the extra rows of an endpoint look different since 0.9.4. `endpoints.png` is taken in a window 940 px high instead of 900: with the taller rows the range down to **Check connections** no longer fits into 900 px, and `scripts/shots.ts` now stops with a message instead of cutting a picture off. `models.png` and `consumers.png` were not touched. Both new images were looked at after recording.
 
+**2026-11-12 (later): `hero.png` and `endpoints.png` recorded once more** with demo data that matches the new note under the capabilities (the LM Studio demo row carries chat and vision, the Ollama demo row an embedding model, and the fake Ollama server says so), so neither picture shows an endpoint the plugin would warn about. `shots.ts` now refuses to take `hero.png` while the settings search box holds text.
+
 ## Images
 
 | Datei | Klasse | referenziert von | muss zeigen |
