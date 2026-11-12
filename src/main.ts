@@ -7,7 +7,9 @@ import { createManagerApi, type ManagerApiHandle } from "./core/api";
 import { LLM_ENDPOINT_MANAGER_PLUGIN_ID, type LlmEndpointManagerApi } from "./core/api-types";
 import { orphanSecretIds } from "./core/list-ops";
 import { loadSettings, newId, secretIdOf, toPersisted, type ManagedEndpoint, type ManagerSettings } from "./core/model";
-import { listModels, probeReachable } from "./obsidian/http";
+import { dropEmbeddingOnChatModels } from "./core/embedding-check";
+import { materialize } from "./core/reachability";
+import { listModels, loadModelKind, probeReachable } from "./obsidian/http";
 import { createShortcutsBridge, type ShortcutsBridge } from "./vendor/kit-obsidian/shortcuts-bridge";
 import { LlmEndpointManagerSettingTab } from "./obsidian/settings-tab";
 
@@ -43,6 +45,30 @@ export default class LlmEndpointManagerPlugin extends Plugin {
     // Sofort setzen: sobald das Plugin-Objekt in app.plugins.plugins auftaucht, soll `api` da sein.
     this.api = this.handle.api;
     this.addSettingTab(new LlmEndpointManagerSettingTab(this.app, this));
+    // Bestand bereinigen, ohne den Start zu halten: erst wenn das Layout steht, dann im Hintergrund.
+    this.app.workspace.onLayoutReady(() => { void this.dropEmbeddingOnChatModels(); });
+  }
+
+  /** Einmal je Start: `embedding` an einer Zeile, deren Modell der Server als Chat-Modell nennt, ausschalten und es sagen (Welle 33,
+   *  Altlast des LM-Studio-Presets). Nur ein ausdrückliches „Chat-Modell" des Servers zählt; Zeilen ohne Antwort bleiben. Greift nur
+   *  zu, wenn die Zeile bei der Rückkehr der Antwort noch dasselbe Modell trägt. */
+  private async dropEmbeddingOnChatModels(): Promise<void> {
+    const token = (sid: string): string | null => this.secrets.get(sid);
+    const r = await dropEmbeddingOnChatModels(this.settings.endpoints, (ep) => {
+      const m = materialize(ep, token);
+      return "error" in m ? Promise.resolve("unknown") : loadModelKind(m.config, ep.provider);
+    });
+    const done: string[] = [];
+    for (const after of r.endpoints) {
+      const live = this.settings.endpoints.find((e) => e.id === after.id);
+      if (!live || live.model !== after.model || !live.capabilities.includes("embedding") || after.capabilities.includes("embedding")) continue;
+      live.capabilities = live.capabilities.filter((c) => c !== "embedding");
+      this.handle.invalidateUrl(live.url);
+      done.push(live.label);
+    }
+    if (done.length === 0) return;
+    await this.saveSettings();
+    new Notice(t("notice.embeddingDropped", done.join(", ")), 20000);
   }
 
   /** Der EINZIGE Weg nach data.json — über toPersisted, nie mit apiKey. */

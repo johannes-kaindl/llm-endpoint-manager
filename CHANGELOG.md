@@ -10,6 +10,11 @@ All notable changes to this project are documented here. The format follows
 
 - Settings, presets: the **LM Studio** preset no longer switches on the capability **embedding**. An endpoint holds one default model, and for LM Studio that is a chat model, so a plugin asking for an embedding endpoint was handed the chat model and got "No models loaded". Endpoints you already created keep their capabilities; switch **embedding** off there, or add a separate endpoint with an embedding model such as `text-embedding-nomic-embed-text-v1.5`.
 
+### Added
+
+- Settings, endpoint list: a row with the capability **embedding** now shows a note under the capabilities when its model is not an embedding model. Red: the server says the model is a chat model (a plugin asking for embeddings would be handed this endpoint and fail). Yellow: it cannot be checked (no model entered, server not answering). The model type comes from the server (LM Studio, Ollama), never from the name.
+- On start, **embedding** is switched off on every endpoint whose model the server names as a chat model, and a notice says which (older LM Studio endpoints created from the preset carried it). Endpoints the server does not answer for are left as they are; switch **embedding** on again in the settings if you changed the model.
+
 ### Fixed
 
 - Documentation, troubleshooting: the entry on `0.0.0.0` as an address now says what was measured on a Mac (the connection check reaches a server through it) and what is not (other systems).

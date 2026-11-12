@@ -5,7 +5,7 @@ import { normalizeEndpoint } from "../vendor/kit/endpoint";
 import { authHeaders, type EndpointConfig } from "../vendor/kit/endpoint_config";
 import { ANTHROPIC_VERSION } from "../vendor/kit/anthropic-wire";
 import { withTimeout } from "../vendor/kit/timeout";
-import type { CapabilityFetch } from "../vendor/kit/capabilities";
+import { fetchModelKind, probeBaseUrl, type CapabilityFetch, type ModelKind } from "../vendor/kit/capabilities";
 import { fetchModelContext, type ModelContext } from "../vendor/kit/model-context";
 import { providerProbe } from "../core/provider";
 import type { Provider } from "../core/model";
@@ -123,4 +123,13 @@ export function loadModelContext(cfg: EndpointConfig, provider: Provider): Promi
   if (provider !== "openai" && provider !== "ollama") return Promise.resolve(null);
   const auth = authHeaders(cfg.apiKey);
   return fetchModelContext((req) => capabilityFetch({ ...req, headers: { ...auth, ...(req.headers ?? {}) } }), normalizeEndpoint(cfg.url), cfg.model?.trim() ?? "", { timers: window });
+}
+
+/** Modelltyp des Zeilen-Modells (Kit `fetchModelKind`: Ollama, dann LM Studio v1, dann v0; wirft nie, `unknown` = der Server sagt es nicht).
+ *  Nur `openai` und `ollama` mit einem Modell werden gefragt; die Anfragen lesen nur und laden kein Modell. Der Schlüssel der Zeile geht mit. */
+export function loadModelKind(cfg: EndpointConfig, provider: Provider): Promise<ModelKind> {
+  const model = cfg.model?.trim() ?? "";
+  if ((provider !== "openai" && provider !== "ollama") || model === "") return Promise.resolve("unknown");
+  const auth = authHeaders(cfg.apiKey);
+  return fetchModelKind((req) => capabilityFetch({ ...req, headers: { ...auth, ...(req.headers ?? {}) } }), probeBaseUrl(cfg.url), model);
 }

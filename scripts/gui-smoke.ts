@@ -70,6 +70,9 @@ const PUNKTE = [
   "I3 Ungültiger Schlüssel → Status rot mit dem Text „Access denied — API key missing or invalid.“ (EN) bzw. dem deutschen Gegenstück",
   "J1 URL in einer unteren Endpunkt-Zeile tippen, dann das Schlüsselfeld anklicken: die Eingabe ist übernommen, die Scrollposition bleibt, der Fokus liegt im Schlüsselfeld derselben Zeile",
   "J2 URL in einer unteren Endpunkt-Zeile tippen, dann neben das Feld tippen (kein Feld): die Eingabe ist übernommen, die Scrollposition bleibt, der Fokus springt nicht in ein Feld der ersten Zeile",
+  "K1 embedding an einem Chat-Modell → roter Hinweis unter den Fähigkeiten mit dem Modellnamen (Modelltyp vom Server, Fake-LM-Studio mit llm und embedding)",
+  "K2 embedding an einem Embedding-Modell desselben Servers → kein Hinweis (und der Server wurde für beide Zeilen gefragt)",
+  "K3 embedding an einem Modell, dessen Server nicht antwortet → gelber Hinweis „nicht prüfbar“, kein roter",
 ] as const;
 const { record, abschluss } = createBilanz({ punkte: PUNKTE });
 
@@ -210,6 +213,7 @@ async function main(): Promise<void> {
 
   let fake: FakeServer | null = null;
   let fakeLm: FakeServer | null = null;
+  let kindServer: FakeServer | null = null;
   let claudeStub: LlmStub | null = null;
   let settings: SettingsStelle | null = null;
   const warnungen: string[] = [];
@@ -849,6 +853,41 @@ async function main(): Promise<void> {
       klickUrl2 && klickDanebe && uebernommen2 !== null && scrollVor2 > 0 && Math.abs(nach2.scroll - Math.min(scrollVor2, nach2.max)) <= 2 && nach2.row !== 0 && !(nach2.row >= 0 && nach2.tag === "INPUT"),
       JSON.stringify({ spur, zielInfo, klickUrl2, klickDanebe, uebernommen: uebernommen2 !== null, scrollVor2, nach2 }),
     );
+
+    // --- K1-K3: Hinweis zu `embedding` an einem Chat-Modell (Welle 33) ----------------------------
+    console.log("\nK · embedding-Hinweis");
+    const kindStub = await startLlmStub({ models: [{ id: "smoke-chat", type: "llm" }, { id: "smoke-embed", type: "embedding" }], lmStudioV1: { capabilities: {} } });
+    kindServer = { url: kindStub.url, stub: kindStub, close: () => kindStub.stop() };
+    const kIds = await cdp.evaluate<{ chat: string; emb: string; dead: string }>(`
+      const p = app.plugins.plugins[${q(PLUGIN_ID)}];
+      const mk = (label, url, model) => { const id = crypto.randomUUID(); p.settings.endpoints.push({ id, label, url, provider: "openai", capabilities: ["chat", "embedding"], enabled: true, model }); return id; };
+      const ids = { chat: mk("gui-smoke K chat", ${q(kindStub.url)}, "smoke-chat"), emb: mk("gui-smoke K embed", ${q(kindStub.url)}, "smoke-embed"), dead: mk("gui-smoke K dead", "http://127.0.0.1:9", "smoke-chat") };
+      await p.saveSettings();
+      return ids;
+    `);
+    settings = await reopenSettings(cdp, port, settings);
+    const kNote = (id: string): string => `(() => { const n = document.querySelector('.lem-row-embed[data-for="${id}"]'); return n ? { text: n.textContent, cls: n.className } : null; })()`;
+    const kChat = await pollUntil<{ text: string; cls: string }>(settings.cdp, `const r = ${kNote(kIds.chat)}; return r && r.text ? r : null;`, 15000, 300);
+    record(
+      "K1 embedding an einem Chat-Modell → roter Hinweis unter den Fähigkeiten mit dem Modellnamen (Modelltyp vom Server, Fake-LM-Studio mit llm und embedding)",
+      kChat !== null && kChat.cls.includes("is-mismatch") && kChat.text.includes("smoke-chat") && /chat model|Chat-Modell/.test(kChat.text),
+      JSON.stringify(kChat),
+    );
+    const kDead = await pollUntil<{ text: string; cls: string }>(settings.cdp, `const r = ${kNote(kIds.dead)}; return r && r.text ? r : null;`, 20000, 300);
+    const kEmb = await settings.cdp.evaluate<{ text: string; cls: string } | null>(`return ${kNote(kIds.emb)};`);
+    const kAsked = kindStub.anfragen().filter((a) => a.route === "api-v1-models").length;
+    record(
+      "K2 embedding an einem Embedding-Modell desselben Servers → kein Hinweis (und der Server wurde für beide Zeilen gefragt)",
+      kEmb !== null && kEmb.text === "" && !kEmb.cls.includes("is-mismatch") && kChat !== null && kAsked >= 2,
+      JSON.stringify({ kEmb, anfragenApiV1Models: kAsked }),
+    );
+    record(
+      "K3 embedding an einem Modell, dessen Server nicht antwortet → gelber Hinweis „nicht prüfbar“, kein roter",
+      kDead !== null && kDead.cls.includes("is-unverified") && !kDead.cls.includes("is-mismatch") && /Could not check|nicht prüfen/.test(kDead.text),
+      JSON.stringify(kDead),
+    );
+    await kindServer.close();
+    kindServer = null;
   } finally {
     // B haengt seinen Fake-Endpunkt am Ende NICHT selbst aus — ohne diesen Schritt hinterlaesst
     // schon ein regulaer DURCHGELAUFENER Lauf einen Rest in settings.endpoints, den C2 des
@@ -858,6 +897,7 @@ async function main(): Promise<void> {
     if (settings) closeSettings(cdp, settings);
     if (fake) await fake.close().catch(() => undefined);
     if (fakeLm) await fakeLm.close().catch(() => undefined);
+    if (kindServer) await kindServer.close().catch(() => undefined);
     if (claudeStub) await claudeStub.stop().catch(() => undefined);
     cdp.close();
     // Auch nach einem Abbruch: Punkte, die nie aufgezeichnet wurden, zaehlen als „nichts gemessen“.

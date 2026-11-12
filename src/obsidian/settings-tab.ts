@@ -10,12 +10,13 @@ import { endpointStatusText, endpointWarningText } from "../vendor/kit-obsidian/
 import { authHeaders, type EndpointRole } from "../vendor/kit/endpoint_config";
 import { normalizeEndpoint } from "../vendor/kit/endpoint";
 import { BACKEND_IDS, BACKENDS, FAMILIES, FAMILY_IDS, MODEL_FAMILIES, type BackendId, type FamilyId } from "../vendor/kit/sampling-profiles";
-import { probeBaseUrl, probeEndpoint } from "../vendor/kit/capabilities";
+import { probeBaseUrl, probeEndpoint, type ModelKind } from "../vendor/kit/capabilities";
+import { embeddingVerdict, modelKindAskable } from "../core/embedding-check";
 import { CAPABILITIES, PROVIDERS, DEFAULT_SHORTCUT_NAME, DEFAULT_SHORTCUT_TIMEOUT_MS, labelFromUrl, newId, withProvider, type ManagedEndpoint, type Provider } from "../core/model";
 import { modelRows, setModelMeta, type ModelRow } from "../core/model-rows";
 import { PRESETS, capabilitiesForProvider } from "../core/provider";
-import { firstActiveUrl } from "../core/reachability";
-import { clientFor, capabilityFetch, loadModelContext } from "./http";
+import { firstActiveUrl, materialize } from "../core/reachability";
+import { clientFor, capabilityFetch, loadModelContext, loadModelKind } from "./http";
 import type { ModelContext } from "../vendor/kit/model-context";
 
 /** Ein Feld in einer Endpunkt-Zeile, ohne Elementbezug: die n-te Zeile, Beschriftung des Feldes, wievieltes unter gleich beschrifteten und
@@ -54,6 +55,10 @@ export function helpOptions(open?: (url: string) => void): HelpSettingOptions {
 
 export class LlmEndpointManagerSettingTab extends PluginSettingTab {
   private modelLists: ModelListCache = createModelListCache();
+  /** Modelltyp je (URL, Anbieter, Modell) für den Hinweis unter `embedding`. Eine Antwort „Chat" oder „Embedding" gilt, bis der Tab schließt;
+   *  „unbekannt" nur kurz, damit ein später gestarteter Server nicht für die ganze Sitzung als ungeprüft stehen bleibt. */
+  private embeddingKinds = new Map<string, { kind: ModelKind; at: number }>();
+  private embeddingAsking = new Set<string>();
   /** Kontextlänge je (URL, Modell): die Zeile zeichnet sich bei jeder Änderung neu, ohne Zwischenspeicher
    *  ginge jedes Mal eine Anfrage an den Server. „Modelle neu laden" leert den Eintrag der URL. */
   private contextCache = new Map<string, Promise<ModelContext | null>>();
@@ -102,6 +107,7 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
   hide(): void {
     this.stopWatching();
     this.contextCache.clear();
+    this.embeddingKinds.clear();
     this.modelLists.clear();   // Kit-Vertrag: sonst bleibt „nicht erreichbar" für die Sitzung stehen
   }
 
@@ -381,7 +387,7 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
         tg.toggleEl.setAttribute("aria-label", t(`cap.${c}`));
         tg.onChange((on) => { void save((e) => {
           e.capabilities = on ? [...new Set([...e.capabilities, c])] : e.capabilities.filter((x) => x !== c);
-        }).then(() => { this.syncCapWarning(host, cfg.id); }); });
+        }).then(() => { this.syncCapWarning(host, cfg.id); this.syncEmbeddingNote(host, cfg.id); }); });
       });
       const toggleEl = caps.controlEl.lastElementChild;
       if (toggleEl && toggleEl !== unit) unit.appendChild(toggleEl);
@@ -397,6 +403,9 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
     const warn = host.createDiv({ cls: "lem-row-warn" });
     warn.setAttribute("data-for", cfg.id);
     this.syncCapWarning(host, cfg.id);
+    const embed = host.createDiv({ cls: "lem-row-embed" });
+    embed.setAttribute("data-for", cfg.id);
+    this.syncEmbeddingNote(host, cfg.id);
     if (cfg.secretId && !this.plugin.secrets.has(cfg.secretId)) host.createDiv({ cls: "lem-row-warn", text: t("row.secretMissing") });
   }
 
@@ -453,6 +462,42 @@ export class LlmEndpointManagerSettingTab extends PluginSettingTab {
     const warn = Array.from(host.querySelectorAll<HTMLElement>(".lem-row-warn")).find((w) => w.getAttribute("data-for") === id);
     if (!warn) return;
     warn.setText(e && e.capabilities.length === 0 ? t("row.noCapability") : "");
+  }
+
+  /** Hinweis unter den Fähigkeiten, wenn `embedding` an einem Modell hängt, das der Server als Chat-Modell nennt (rot), oder wenn sich
+   *  das nicht prüfen lässt (gelb). Der Modelltyp kommt vom Server (Kit `fetchModelKind`), nie aus dem Namen; die Antwort holt der Tab
+   *  im Hintergrund und zeichnet nur diese Zeile nach. */
+  private syncEmbeddingNote(host: HTMLElement, id: string): void {
+    const note = Array.from(host.querySelectorAll<HTMLElement>(".lem-row-embed")).find((w) => w.getAttribute("data-for") === id);
+    if (!note) return;
+    const show = (text: string, level: "" | "is-mismatch" | "is-unverified"): void => {
+      note.setText(text);
+      note.removeClass("is-mismatch");
+      note.removeClass("is-unverified");
+      if (level) note.addClass(level);
+    };
+    const e = this.plugin.settings.endpoints.find((x) => x.id === id);
+    if (!e || embeddingVerdict(e, "unknown") === "none") { show("", ""); return; }
+    if (!modelKindAskable(e)) { show(t("row.embeddingNoModel"), "is-unverified"); return; }
+    const key = `${normalizeEndpoint(e.url)}|${e.provider}|${e.model ?? ""}`;
+    const known = this.embeddingKinds.get(key);
+    if (known && (known.kind !== "unknown" || Date.now() - known.at < 60_000)) {
+      const verdict = embeddingVerdict(e, known.kind);
+      if (verdict === "mismatch") show(t("row.embeddingOnChat", e.model ?? ""), "is-mismatch");
+      else if (verdict === "unverified") show(t("row.embeddingUnverified", e.model ?? ""), "is-unverified");
+      else show("", "");
+      return;
+    }
+    show("", "");
+    if (this.embeddingAsking.has(key)) return;
+    this.embeddingAsking.add(key);
+    const m = materialize(e, (sid) => this.plugin.secrets.get(sid));
+    const ask: Promise<ModelKind> = "error" in m ? Promise.resolve("unknown") : loadModelKind(m.config, e.provider).catch((): ModelKind => "unknown");
+    void ask.then((kind) => {
+      this.embeddingAsking.delete(key);
+      this.embeddingKinds.set(key, { kind, at: Date.now() });
+      if (note.isConnected !== false) this.syncEmbeddingNote(host, id);
+    });
   }
 
   /** Modelltabelle (Familie, Alias) und Backend je Endpunkt — bewusst NICHT in `renderExtra`

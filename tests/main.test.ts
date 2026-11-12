@@ -1,6 +1,13 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { makeFakeApp } from "./vendor/kit/obsidian-mock";
 import LlmEndpointManagerPlugin from "../src/main";
+
+// Modelltyp-Abfrage ersetzen: der Server, den sie fragt, liegt nicht im Test; die Parser und der Ablauf sind in embedding-check.test.ts gegen die gemessenen Antworten geprüft.
+const kinds = vi.hoisted(() => ({ byModel: {} as Record<string, "chat" | "embedding" | "unknown">, asked: [] as string[] }));
+vi.mock("../src/obsidian/http", async (orig) => ({
+  ...(await orig<typeof import("../src/obsidian/http")>()),
+  loadModelKind: (cfg: { model?: string }) => { kinds.asked.push(cfg.model ?? ""); return Promise.resolve(kinds.byModel[cfg.model ?? ""] ?? "unknown"); },
+}));
 
 function plugin(data: unknown, app = makeFakeApp()): LlmEndpointManagerPlugin {
   const p = new LlmEndpointManagerPlugin(app, { id: "llm-endpoint-manager", name: "x", version: "0", minAppVersion: "1.11.4", description: "", author: "", authorUrl: "", isDesktopOnly: false, dir: "" });
@@ -67,5 +74,29 @@ describe("LlmEndpointManagerPlugin", () => {
     const p = plugin({}, makeFakeApp());
     await p.onload();
     expect(p.orphanSecrets()).toEqual([]);
+  });
+
+  it("beim Laden: embedding an einem Chat-Modell wird ausgeschaltet und gespeichert, ein Embedding-Modell und ein stummer Server bleiben", async () => {
+    kinds.byModel = { "qwen/qwen3.8-27b": "chat", "text-embedding-nomic-embed-text-v1.5": "embedding" }; kinds.asked = [];
+    const caps = ["chat", "embedding"];
+    const p = plugin({ endpoints: [
+      { id: "lm", label: "LM Studio", url: "http://localhost:1234", provider: "openai", capabilities: caps, enabled: true, model: "qwen/qwen3.8-27b" },
+      { id: "emb", label: "Embedder", url: "http://localhost:1235", provider: "openai", capabilities: caps, enabled: true, model: "text-embedding-nomic-embed-text-v1.5" },
+      { id: "dead", label: "Offline", url: "http://localhost:1236", provider: "openai", capabilities: caps, enabled: true, model: "irgendwas" },
+    ] });
+    await p.onload();
+    await vi.waitFor(() => expect(p.settings.endpoints.find((e) => e.id === "lm")?.capabilities).toEqual(["chat"]));
+    expect(p.settings.endpoints.find((e) => e.id === "emb")?.capabilities).toEqual(["chat", "embedding"]);
+    expect(p.settings.endpoints.find((e) => e.id === "dead")?.capabilities).toEqual(["chat", "embedding"]);
+    const saved = (p as unknown as { __saved: Array<{ endpoints: Array<{ id: string; capabilities: string[] }> }> }).__saved;
+    expect(saved.at(-1)?.endpoints.find((e) => e.id === "lm")?.capabilities).toEqual(["chat"]);
+  });
+  it("beim Laden: ohne Fähigkeit embedding wird nichts gefragt und nichts gespeichert", async () => {
+    kinds.byModel = { m: "chat" }; kinds.asked = [];
+    const p = plugin({ endpoints: [{ id: "a", url: "http://a", provider: "openai", capabilities: ["chat"], enabled: true, model: "m" }] });
+    await p.onload();
+    await Promise.resolve();
+    expect(kinds.asked).toEqual([]);
+    expect((p as unknown as { __saved: unknown[] }).__saved).toEqual([]);
   });
 });

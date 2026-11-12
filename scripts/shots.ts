@@ -63,15 +63,20 @@ async function startFakeLmStudio(): Promise<Fake> {
   return aufStub(stub);
 }
 
+/** Ollama-Attrappe: `/api/show` sagt, das Modell ist ein Embedding-Modell (so stimmt `embedding` an der Zeile, und der Editor zeigt keinen Hinweis). */
 async function startFakeOllama(): Promise<Fake> {
-  return aufStub(await startLlmStub({ port: OLLAMA_PORT, models: ["llama3.2:3b", "nomic-embed-text"] }));
+  return aufStub(await startLlmStub({
+    port: OLLAMA_PORT,
+    models: ["llama3.2:3b", "nomic-embed-text"],
+    zusatz: { "POST /api/show": () => ({ json: { capabilities: ["embedding"] } }) },
+  }));
 }
 
 // --- Zustand ----------------------------------------------------------------------------
 const ENDPOINTS = [
   {
     id: "demo-lmstudio", label: "LM Studio (desktop)", url: `http://localhost:${LM_PORT}`, provider: "openai",
-    capabilities: ["chat", "vision", "embedding"], enabled: true, model: "qwen/qwen3.8-27b", backend: "lmstudio",
+    capabilities: ["chat", "vision"], enabled: true, model: "qwen/qwen3.8-27b", backend: "lmstudio",
     models: [
       { id: "qwen/qwen3.8-27b", family: "qwen3.8" },
       { id: "qwen/qwen3.8-27b@4bit", aliasOf: "qwen/qwen3.8-27b" },
@@ -79,7 +84,7 @@ const ENDPOINTS = [
   },
   {
     id: "demo-ollama", label: "Ollama (laptop)", url: `http://localhost:${OLLAMA_PORT}`, provider: "ollama",
-    capabilities: ["chat", "embedding"], enabled: true, model: "llama3.2:3b", backend: "ollama",
+    capabilities: ["embedding"], enabled: true, model: "nomic-embed-text", backend: "ollama",
   },
   {
     id: "demo-office", label: "Office server", url: `http://localhost:${CLOSED_PORT}`, provider: "openai",
@@ -221,6 +226,16 @@ async function main(): Promise<void> {
     }
     const want = (n: string): boolean => only === undefined || only === n;
     if (want("hero")) {
+      // Ein Tastendruck aus der Umgebung kann im Suchfeld der Einstellungen landen („tt“ am 2026-11-12) und die Seitenleiste in eine Trefferliste
+      // verwandeln: Feld leeren, Fokus lösen, und das Bild nur aufnehmen, wenn es danach leer ist.
+      const suche = await settingsWin.evaluate<string>(`
+        const i = document.querySelector("input[placeholder^='Search settings']");
+        if (i && i.value) { i.value = ""; i.dispatchEvent(new Event("input", { bubbles: true })); }
+        if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+        await new Promise((r) => setTimeout(r, 600));
+        return i ? i.value : "(kein Suchfeld)";
+      `);
+      if (suche !== "") throw new Error(`Das Suchfeld der Einstellungen ist nicht leer („${suche}“) — hero.png wird so nicht aufgenommen.`);
       await win_scroll0(settingsWin);
       const fenster = await settingsWin.evaluate<{ w: number; h: number }>(`return { w: innerWidth, h: innerHeight };`);
       console.log(`  Fenster ${fenster.w}x${fenster.h}`);

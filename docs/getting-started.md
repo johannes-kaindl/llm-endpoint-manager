@@ -30,7 +30,7 @@ Below the address, the row shows one of these roles:
 
 ## 4. Choose what the endpoint can do
 
-Look at the row's lines **Protocol** and **Capabilities**. Switch on what the server really offers: **chat**, **embedding**, **vision** (understanding images) or **image** (generating images). A plugin asks for a capability, not for a server, so a row without any capability is invisible to all plugins and shows *Without a capability no plugin will find this endpoint.*
+Look at the row's lines **Protocol** and **Capabilities**. Switch on what the server really offers: **chat**, **embedding**, **vision** (understanding images) or **image** (generating images). A plugin asks for a capability, not for a server, so a row without any capability is invisible to all plugins and shows *Without a capability no plugin will find this endpoint.* **embedding** belongs on a row whose model is an embedding model (for example `text-embedding-nomic-embed-text-v1.5` in LM Studio, `qwen3-embedding:8b` in Ollama): an endpoint carries one default model, and a plugin asking for embeddings would otherwise be handed a chat model. The plugin asks the server what the model is (LM Studio and Ollama say it) and shows a red note under the capabilities if **embedding** sits on a chat model, a yellow one if it cannot tell (no model entered, server not answering).
 
 ## 5. Store a token (optional)
 
