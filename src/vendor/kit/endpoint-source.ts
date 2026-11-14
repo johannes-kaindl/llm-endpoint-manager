@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.62.0, src/pure/endpoint-source.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.89.0, src/pure/endpoint-source.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 import { hydrateEndpointSecrets, resolveActiveEndpointConfig, type EndpointConfig } from "./endpoint_config";
 import type { SecretStore } from "./secrets";
 import { familyFromName, type BackendId, type FamilyId, type ModelFamilyId } from "./sampling-profiles";
@@ -43,8 +43,12 @@ export interface LlmEndpointManagerApi {
   list(filter?: ListFilter): ApiEndpoint[];
   get(id: string): ApiEndpoint | null;
   resolve(capability: Capability, opts?: { caller?: string; transports?: EndpointTransport[] }): Promise<ResolvedEndpoint | ApiError>;
-  materialize(id: string, opts?: { caller?: string }): Promise<ResolvedEndpoint | ApiError>;
+  materialize(id: string, opts?: { caller?: string; transports?: EndpointTransport[] }): Promise<ResolvedEndpoint | ApiError>;
   models(id: string, opts?: { force?: boolean }): Promise<string[] | ApiError>;
+  /** Additiv in API v1 (llm-endpoint-manager seit b9849b2, `version` bleibt 1) und **optional**: wie `models()`, aber mit Erreichbarkeit. `models: []` mit `reachable: true` heißt „antwortet, gibt aber keine Liste
+   *  heraus“, mit `reachable: false` „nicht erreichbar“ (`models()` kann beides nicht trennen). Ein Manager ohne diese Methode besteht `isLlmEndpointManagerApi` weiter (`METHODS` kennt sie nicht); ein Konsument
+   *  prüft `typeof api.modelList === "function"` und fällt sonst auf `models()` zurück (`managerModelList` in `obsidian/endpoint-plumbing`). */
+  modelList?(id: string, opts?: { force?: boolean }): Promise<{ models: string[]; reachable: boolean } | ApiError>;
   importEndpoints(eps: EndpointConfig[], capability: Capability): Promise<ImportResult | ApiError>;
   on(event: "changed", cb: () => void): () => void;
 }
@@ -100,6 +104,10 @@ export interface EndpointSourceInput {
   /** Opt-in für `resolve()` wie `list()`: ohne Angabe nur `"http"` (ein älterer Manager ignoriert das Feld). Wer `"anthropic"`
    *  oder `"shortcuts"` anfordert, muss den passenden Transport bereitstellen (`llm-connection` `transports`). */
   transports?: EndpointTransport[];
+  /** Seit 0.73.0: die Transporte nur für den AUTOMATISCHEN Weg (`manager.resolve`). Fehlt die Angabe, gilt `transports` auch dort. Eine
+   *  ausdrückliche Wahl (`materialize`) und die wählbare Liste bleiben bei `transports`: so kennt „Automatisch“ einen Endpunkt nicht,
+   *  den der Nutzer nur ausdrücklich wählen kann (`llm-connection` `transports.anthropic: "explicit"`). */
+  autoTransports?: EndpointTransport[];
   backendOf?: (cfg: EndpointConfig) => Promise<BackendId | null>;
 }
 export interface EndpointSourceResult {
@@ -121,6 +129,10 @@ export interface EndpointSourceResult {
   shortcut?: ShortcutTransportConfig;
   /** Modell-Tabelle des Managers (nur Manager-Pfad), damit ein Aufruf mit anderem Modell dessen Familie und Alias kennt. */
   models?: ApiModelInfo[];
+  /** Die `id` des `ResolvedEndpoint`, das der Manager geliefert hat (`resolve` wie `materialize`): der Endpunkt, der diese Quelle trägt. Gesetzt genau dann, wenn `kind === "manager"`, ein `config` aufgelöst wurde
+   *  und die `id` ein nicht-leerer String ist (Formprüfung statt Vertrauen: ein Fremdplugin liefert vielleicht keine). Lokal, ohne `config` und ohne brauchbare `id` fehlt es: unbekannt bleibt unbekannt, nie geraten
+   *  (Welle 34, Paket 9; vorher erriet jede Verbindung den Endpunkt aus `list()` und band bei einem unerreichbaren ersten Eintrag den falschen). */
+  endpointId?: string;
 }
 
 /** Familie und gesendete Schreibweise eines Modells. `aliasOf` wird genau EINMAL aufgelöst —
@@ -159,7 +171,7 @@ function localModelOf(choice: EndpointChoice | undefined, config: EndpointConfig
 async function finish(
   base: { kind: SourceKind; config: EndpointConfig | null; model: string; reason?: ApiErrorCode },
   input: EndpointSourceInput,
-  manager: { backend?: BackendId; models?: ApiModelInfo[]; defaultModel?: string; transport?: EndpointTransport; shortcut?: ShortcutTransportConfig } | null,
+  manager: { id?: unknown; backend?: BackendId; models?: ApiModelInfo[]; defaultModel?: string; transport?: EndpointTransport; shortcut?: ShortcutTransportConfig } | null,
 ): Promise<EndpointSourceResult> {
   const d = describeModel(base.model, manager?.models);
   let backend: BackendId = "unknown";
@@ -177,6 +189,7 @@ async function finish(
   if (manager?.models) out.models = manager.models;
   if (manager?.transport) out.transport = manager.transport;
   if (manager?.shortcut) out.shortcut = manager.shortcut;
+  if (base.kind === "manager" && base.config && typeof manager?.id === "string" && manager.id !== "") out.endpointId = manager.id;
   return out;
 }
 
@@ -192,7 +205,10 @@ export async function resolveEndpointSource(
     const config = await resolveActiveEndpointConfig(input.secrets && input.secretPrefix ? hydrateEndpointSecrets(input.local, input.secrets, input.secretPrefix) : input.local, ping);
     return finish({ kind: "local", config, model: config ? localModelOf(input.choice, config) : "" }, input, null);
   }
-  const opts = input.caller || input.transports ? { ...(input.caller ? { caller: input.caller } : {}), ...(input.transports ? { transports: input.transports } : {}) } : undefined;
+  const optsFor = (transports: EndpointTransport[] | undefined) => input.caller || transports
+    ? { ...(input.caller ? { caller: input.caller } : {}), ...(transports ? { transports } : {}) } : undefined;
+  const opts = optsFor(input.transports);
+  const autoOpts = optsFor(input.autoTransports ?? input.transports);
   try {
     let reason: ApiErrorCode | undefined;
     const wanted = input.choice?.endpointId;
@@ -203,7 +219,7 @@ export async function resolveEndpointSource(
       }
       reason = m.error;   // verwaiste Wahl → automatisch weiter, Grund mitteilen
     }
-    const r = await manager.resolve(input.capability, opts);
+    const r = await manager.resolve(input.capability, autoOpts);
     if ("error" in r) {
       // Der Manager-`resolve` kennt nur `no-endpoint` (er überspringt abgeschaltete und schlüssellose Endpunkte still).
       // Hat der Nutzer einen Endpunkt ausdrücklich gewählt und DER scheiterte an etwas, das er abstellen kann, ist das
@@ -212,7 +228,10 @@ export async function resolveEndpointSource(
       const fixable = reason === "disabled" || reason === "secret-missing" ? reason : undefined;
       return finish({ kind: "manager", config: null, model: "", reason: fixable ?? r.error }, input, null);
     }
-    const base = { kind: "manager" as const, config: r.config, model: modelOf(input.choice, r.defaultModel), ...(reason ? { reason } : {}) };
+    // Verwaiste Wahl (`reason` gesetzt): `choice.model` gehörte zum gewählten, nicht erreichbaren Endpunkt. An den automatischen geschickt wäre es ein
+    // fremder Modellname an einen fremden Endpunkt (0.87.0, Spec § 4.9); es gilt dessen Standard-Modell. Die gespeicherte Wahl bleibt unberührt:
+    // wird der Endpunkt wieder eingeschaltet, gilt sie wieder. Eine Alt-Wahl `{ model }` ohne `endpointId` hat keinen `reason` und behält ihr Modell.
+    const base = { kind: "manager" as const, config: r.config, model: reason ? modelOf(undefined, r.defaultModel) : modelOf(input.choice, r.defaultModel), ...(reason ? { reason } : {}) };
     return finish(base, input, r);
   } catch {
     return finish({ kind: "manager", config: null, model: "", reason: "unreachable" }, input, null);

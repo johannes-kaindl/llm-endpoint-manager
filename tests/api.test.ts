@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { createManagerApi, type ApiDeps } from "../src/core/api";
 import { loadSettings, type ManagerSettings } from "../src/core/model";
 import { MemorySecretStore } from "../src/vendor/kit/secrets";
-import { LLM_ENDPOINT_MANAGER_API_VERSION, hasModelList, type EndpointTransport } from "../src/core/api-types";
+import { LLM_ENDPOINT_MANAGER_API_VERSION, type EndpointTransport } from "../src/core/api-types";
 import { isLlmEndpointManagerApi } from "../src/vendor/kit/endpoint-source";
 
 function deps(initial: ManagerSettings, over: Partial<ApiDeps> = {}) {
@@ -79,13 +79,12 @@ describe("createManagerApi", () => {
       expect(probe).not.toHaveBeenCalled();
       expect(api.version).toBe(1);
       expect(isLlmEndpointManagerApi(api)).toBe(true);
-      expect(hasModelList(api)).toBe(true);
+      expect(typeof api.modelList).toBe("function");
     });
     it("ein v1-Manager ohne die Methode wird erkannt (Rückfall auf models())", () => {
       const old = { version: 1, list() { return []; }, get() { return null; }, resolve() { return Promise.resolve({ error: "no-endpoint" }); }, materialize() { return Promise.resolve({ error: "not-found" }); }, models() { return Promise.resolve([]); }, importEndpoints() { return Promise.resolve({ error: "no-endpoint" }); }, on() { return () => undefined; } };
       expect(isLlmEndpointManagerApi(old)).toBe(true);
-      expect(hasModelList(old)).toBe(false);
-      expect(hasModelList(null)).toBe(false);
+      expect(typeof (old as { modelList?: unknown }).modelList).toBe("undefined");
     });
     it("teilt Cache und force mit models(): ein Aufruf holt die Liste einmal, force lädt neu und verwirft die Erreichbarkeit der URL", async () => {
       const { d, listModels, probe } = deps(base());
