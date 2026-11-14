@@ -68,6 +68,8 @@ const PUNKTE = [
   "I1 Preset Anthropic (Claude API) → Zeile mit provider/transport/backend anthropic, chat+vision, Hinweis zum Schlüssel sichtbar; die Knopfreihe der Vorlagen bricht um und liegt ganz im Fenster",
   "I2 Claude-Endpunkt gegen den Anthropic-Stub: Schlüssel setzen → Status grün, Modelle aus /v1/models, Stub sah x-api-key und anthropic-version; list()/resolve() ohne Opt-in zeigen ihn nie, mit Opt-in ja",
   "I3 Ungültiger Schlüssel → Status rot mit dem Text „Access denied — API key missing or invalid.“ (EN) bzw. dem deutschen Gegenstück",
+  "L1 Claude-Karte mit Modell: die Zeile zeigt „Context: max 200,000 tokens“ (max_input_tokens aus dem Anthropic-Stub, genau eine Anfrage GET /v1/models?limit=1000 mit x-api-key); ein Modell ohne Zahl bekommt keine Zeile",
+  "M1 api.modelList am laufenden Plugin: gestoppter Server {[], false}, Server ohne Liste {[], true}, Server mit Liste sortiert und erreichbar; models() bleibt in beiden Fällen []",
   "J1 URL in einer unteren Endpunkt-Zeile tippen, dann das Schlüsselfeld anklicken: die Eingabe ist übernommen, die Scrollposition bleibt, der Fokus liegt im Schlüsselfeld derselben Zeile",
   "J2 URL in einer unteren Endpunkt-Zeile tippen, dann neben das Feld tippen (kein Feld): die Eingabe ist übernommen, die Scrollposition bleibt, der Fokus springt nicht in ein Feld der ersten Zeile",
   "K1 embedding an einem Chat-Modell → roter Hinweis unter den Fähigkeiten mit dem Modellnamen (Modelltyp vom Server, Fake-LM-Studio mit llm und embedding)",
@@ -728,7 +730,7 @@ async function main(): Promise<void> {
     );
     if (!claudeEp) throw new Error("I1 fehlgeschlagen — ohne Claude-Zeile sind I2/I3 gegenstandslos.");
 
-    claudeStub = await startLlmStub({ anbieter: "anthropic", schluessel: "sk-ant-smoke", models: ["claude-haiku-5-5", "claude-sonnet-5-5"] });
+    claudeStub = await startLlmStub({ anbieter: "anthropic", schluessel: "sk-ant-smoke", models: [{ id: "claude-haiku-5-5", max_input_tokens: 200000, max_tokens: 64000 }, { id: "claude-sonnet-5-5", max_input_tokens: null }] });
     // Die Zeile zeigt auf den Stub (die Vorlage trägt den echten Host, der hier nie angefragt wird), Token über die Oberfläche.
     await cdp.evaluate(`
       const p = app.plugins.plugins[${q(PLUGIN_ID)}];
@@ -779,6 +781,39 @@ async function main(): Promise<void> {
       JSON.stringify({ status: statusOk?.cls, kopf: claudeKopf, api: claudeApi }),
     );
 
+    // L1 — die Kontextgrenze der Claude-Zeile (Welle 34): Modell eintragen, Einstellungen neu öffnen, die Zeile unter der Claude-Karte nennt das Fenster.
+    // Das zweite Modell trägt `max_input_tokens: null` (die API nennt dann keine Zahl): die Zeile bleibt leer wie vorher.
+    const ctxText = async (modell: string): Promise<{ t: string } | null> => {
+      await cdp.evaluate(`
+        const p = app.plugins.plugins[${q(PLUGIN_ID)}];
+        const e = p.settings.endpoints.find((x) => x.id === ${q(claudeEp.id)});
+        e.model = ${q(modell)};
+        await p.saveSettings();
+        return true;
+      `);
+      settings = await reopenSettings(cdp, port, settings);
+      return pollUntil<{ t: string }>(settings.cdp, `
+        const row = ${settings.el(`root.querySelector(".okit-ep-row")`)};
+        const c = row ? row.querySelector(".okit-ep-context") : null;
+        return c ? { t: c.textContent || "" } : null;
+      `, 8000, 300);
+    };
+    const mitZahl = await ctxText("claude-haiku-5-5");
+    const ctxReq = claudeStub.letzte("models");
+    const ctxKopf = ctxReq ? { url: ctxReq.url, key: ctxReq.header["x-api-key"], version: ctxReq.header["anthropic-version"], auth: ctxReq.header["authorization"] ?? null } : null;
+    const ohneZahl = await ctxText("claude-sonnet-5-5").catch(() => null);
+    const nachZeit = await settings.cdp.evaluate<{ n: number }>(`
+      const row = ${settings.el(`root.querySelector(".okit-ep-row")`)};
+      return { n: row ? row.querySelectorAll(".okit-ep-context").length : -1 };
+    `);
+    record(
+      "L1 Claude-Karte mit Modell: die Zeile zeigt „Context: max 200,000 tokens“ (max_input_tokens aus dem Anthropic-Stub, genau eine Anfrage GET /v1/models?limit=1000 mit x-api-key); ein Modell ohne Zahl bekommt keine Zeile",
+      mitZahl !== null && ["Context: max 200,000 tokens", "Kontext: max 200.000 Token"].includes(mitZahl.t)
+        && ctxKopf?.key === "sk-ant-smoke" && ctxKopf.version === "2023-06-01" && ctxKopf.auth === null && ctxKopf.url.includes("/v1/models?limit=1000")
+        && ohneZahl === null && nachZeit.n === 0,
+      JSON.stringify({ mitZahl, ohneZahl, kopf: ctxKopf, zeilenOhneZahl: nachZeit.n }),
+    );
+
     // I3 — falscher Schlüssel: der Stub antwortet 401 authentication_error, die Zeile sagt es in Worten.
     await cdp.evaluate(`
       app.secretStorage.setSecret(${q(`${PLUGIN_ID}-${claudeEp.id}`)}, "falsch");
@@ -794,6 +829,45 @@ async function main(): Promise<void> {
       "I3 Ungültiger Schlüssel → Status rot mit dem Text „Access denied — API key missing or invalid.“ (EN) bzw. dem deutschen Gegenstück",
       statusBad !== null && ["Access denied — API key missing or invalid.", "Zugriff verweigert — Schlüssel fehlt oder ist ungültig."].includes(statusBad.tip),
       JSON.stringify(statusBad),
+    );
+
+    // M1 — api.modelList am laufenden Plugin (Welle 34, obsidian-kit 0.89.0): drei Endpunkte ohne Schlüssel, gestoppt / ohne Liste / mit Liste.
+    const mDown = await startLlmStub({ models: ["m"] });
+    const mDownUrl = mDown.url;
+    await mDown.stop();
+    const mNoList = await startLlmStub({ models: [] });
+    const mList = await startLlmStub({ models: ["zeta", "alpha"] });
+    const modelListe = await cdp.evaluate<{ down: unknown; noList: unknown; list: unknown; modelsDown: unknown; modelsNoList: unknown; unbekannt: unknown; vorhanden: boolean }>(`
+      const p = app.plugins.plugins[${q(PLUGIN_ID)}];
+      p.settings.endpoints = [
+        { id: "m-down", label: "M down", url: ${q(mDownUrl)}, provider: "openai", capabilities: ["chat"], enabled: true },
+        { id: "m-nolist", label: "M nolist", url: ${q(mNoList.url)}, provider: "openai", capabilities: ["chat"], enabled: true },
+        { id: "m-list", label: "M list", url: ${q(mList.url)}, provider: "openai", capabilities: ["chat"], enabled: true },
+      ];
+      await p.saveSettings();
+      p.handle.reachability.clear();
+      const api = p.api;
+      return {
+        vorhanden: typeof api.modelList === "function",
+        down: await api.modelList("m-down", { force: true }),
+        noList: await api.modelList("m-nolist", { force: true }),
+        list: await api.modelList("m-list", { force: true }),
+        modelsDown: await api.models("m-down"),
+        modelsNoList: await api.models("m-nolist"),
+        unbekannt: await api.modelList("gibt-es-nicht"),
+      };
+    `);
+    await mNoList.stop().catch(() => undefined);
+    await mList.stop().catch(() => undefined);
+    record(
+      "M1 api.modelList am laufenden Plugin: gestoppter Server {[], false}, Server ohne Liste {[], true}, Server mit Liste sortiert und erreichbar; models() bleibt in beiden Fällen []",
+      modelListe.vorhanden
+        && JSON.stringify(modelListe.down) === JSON.stringify({ models: [], reachable: false })
+        && JSON.stringify(modelListe.noList) === JSON.stringify({ models: [], reachable: true })
+        && JSON.stringify(modelListe.list) === JSON.stringify({ models: ["alpha", "zeta"], reachable: true })
+        && JSON.stringify(modelListe.modelsDown) === "[]" && JSON.stringify(modelListe.modelsNoList) === "[]"
+        && JSON.stringify(modelListe.unbekannt) === JSON.stringify({ error: "not-found" }),
+      JSON.stringify(modelListe),
     );
 
     // J1 — der Ablauf eines Nutzers mit echten Klicks: URL einer Zeile weiter unten ändern, dann ins Schlüsselfeld wechseln. Das
