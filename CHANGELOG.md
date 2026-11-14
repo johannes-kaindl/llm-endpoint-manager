@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.10.0] — 2026-11-14
+
 ### Added
 
 - Settings, endpoint list: the **Claude** row now shows the context length of its model ("Context: max N tokens"), like the LM Studio and Ollama rows. It is read from the model list of the Anthropic API (`max_input_tokens`, one request, with the key of the row); if the list gives no number for the model, the row stays empty as before.
