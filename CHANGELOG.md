@@ -8,6 +8,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Settings, endpoint list: the **Claude** row now shows the context length of its model ("Context: max N tokens"), like the LM Studio and Ollama rows. It is read from the model list of the Anthropic API (`max_input_tokens`, one request, with the key of the row); if the list gives no number for the model, the row stays empty as before.
 - Plugin API: the new method `modelList(id, { force })` returns `{ models, reachable }`. Until now `models(id)` returned `[]` both for an endpoint that is switched off and for one that answers without a model list, so a model dropdown could not say "not reachable". The API version stays 1; the method is additive, and a plugin that does not know it keeps using `models(id)`, which behaves as before.
 
 ## [0.9.5] — 2026-11-12

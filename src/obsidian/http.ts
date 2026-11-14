@@ -118,11 +118,20 @@ export function clientFor(cfg: EndpointConfig, provider: Provider): { probe(): P
 /** Kontextlänge des Zeilen-Modells (Kit `fetchModelContext`: LM Studio, dann Ollama; wirft nie, `null` =
  *  der Server nennt keine Zahl). Nur für HTTP-Zeilen, die ein Chat-Modell tragen können: Kurzbefehl-,
  *  A1111- und ComfyUI-Zeilen haben keinen Kontext-Endpunkt und bekommen keine Anfrage. Der Schlüssel der
- *  Zeile geht mit, sonst bleibt ein geschützter Server still bei `null`. */
+ *  Zeile geht mit, sonst bleibt ein geschützter Server still bei `null`.
+ *  Claude-Zeilen (`provider: "anthropic"`) fragen den Zweig des Kits: genau ein `GET /v1/models?limit=1000`, Fenster aus
+ *  `max_input_tokens`. Die Kopfzeilen kommen aus `probeHeaders` (`x-api-key` statt `Bearer`, sonst 401 und still `null`);
+ *  der Kit-Zweig sendet selbst nur `anthropic-version`. Die Transport-Wahl folgt dem Anbieter der Zeile, nicht der URL
+ *  (ein Gateway verdeckt den Host). Nennt die Liste keine Zahl, bleibt die Zeile leer wie vorher. */
 export function loadModelContext(cfg: EndpointConfig, provider: Provider): Promise<ModelContext | null> {
-  if (provider !== "openai" && provider !== "ollama") return Promise.resolve(null);
-  const auth = authHeaders(cfg.apiKey);
-  return fetchModelContext((req) => capabilityFetch({ ...req, headers: { ...auth, ...(req.headers ?? {}) } }), normalizeEndpoint(cfg.url), cfg.model?.trim() ?? "", { timers: window });
+  if (provider !== "openai" && provider !== "ollama" && provider !== "anthropic") return Promise.resolve(null);
+  const auth = provider === "anthropic" ? probeHeaders(cfg, provider) : authHeaders(cfg.apiKey);
+  return fetchModelContext(
+    (req) => capabilityFetch({ ...req, headers: { ...auth, ...(req.headers ?? {}) } }),
+    normalizeEndpoint(cfg.url),
+    cfg.model?.trim() ?? "",
+    { timers: window, ...(provider === "anthropic" ? { provider: "anthropic" as const } : {}) },
+  );
 }
 
 /** Modelltyp des Zeilen-Modells (Kit `fetchModelKind`: Ollama, dann LM Studio v1, dann v0; wirft nie, `unknown` = der Server sagt es nicht).

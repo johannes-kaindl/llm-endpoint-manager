@@ -162,6 +162,37 @@ describe("loadModelContext", () => {
     rq.mockRejectedValue(new Error("ECONNREFUSED"));
     expect(await loadModelContext({ url: "http://h:1234", model: "m" }, "openai")).toBeNull();
   });
+  describe("Anthropic (Kit-Zweig `provider: \"anthropic\"`)", () => {
+    const models = { data: [{ id: "claude-a", max_input_tokens: 200000, max_tokens: 64000 }, { id: "claude-b", max_input_tokens: null }], has_more: false };
+    it("fragt genau einmal GET /v1/models?limit=1000 mit x-api-key und anthropic-version, nie mit Bearer, und liest max_input_tokens", async () => {
+      rq.mockClear();
+      rq.mockResolvedValue({ status: 200, text: JSON.stringify(models) });
+      const ctx = await loadModelContext({ url: "https://api.anthropic.com", apiKey: "sk-ant-x", model: "claude-a" }, "anthropic");
+      expect(ctx).toEqual({ maxContextLength: 200000 });
+      expect(rq.mock.calls.length).toBe(1);
+      const arg = lastCallArg() as { url: string; method: string; headers: Record<string, string> };
+      expect(arg.url).toBe("https://api.anthropic.com/v1/models?limit=1000");
+      expect(arg.method).toBe("GET");
+      expect(arg.headers).toEqual({ "x-api-key": "sk-ant-x", "anthropic-version": "2023-06-01" });
+      expect(Object.keys(arg.headers)).not.toContain("Authorization");
+    });
+    it("Modell ohne Fenster (null) oder nicht in der Liste: kein Wurf, keine LM-Studio-/Ollama-Anfrage", async () => {
+      rq.mockClear();
+      rq.mockResolvedValue({ status: 200, text: JSON.stringify(models) });
+      expect(await loadModelContext({ url: "https://api.anthropic.com", apiKey: "k", model: "claude-b" }, "anthropic")).toEqual({});
+      expect(await loadModelContext({ url: "https://api.anthropic.com", apiKey: "k", model: "unbekannt" }, "anthropic")).toBeNull();
+      expect(rq.mock.calls.map((c) => (c[0] as { url: string }).url).every((u) => u.endsWith("/v1/models?limit=1000"))).toBe(true);
+    });
+    it("ohne Modell: null und keine Anfrage; 401 oder Netzfehler: null", async () => {
+      rq.mockClear();
+      expect(await loadModelContext({ url: "https://api.anthropic.com", apiKey: "k" }, "anthropic")).toBeNull();
+      expect(rq.mock.calls.length).toBe(0);
+      rq.mockResolvedValue({ status: 401, text: "{}" });
+      expect(await loadModelContext({ url: "https://api.anthropic.com", model: "claude-a" }, "anthropic")).toBeNull();
+      rq.mockRejectedValue(new Error("offline"));
+      expect(await loadModelContext({ url: "https://api.anthropic.com", apiKey: "k", model: "claude-a" }, "anthropic")).toBeNull();
+    });
+  });
 });
 
 describe("loadLmStudioModelKind (nur, was LM Studio ausdrücklich sagt)", () => {
