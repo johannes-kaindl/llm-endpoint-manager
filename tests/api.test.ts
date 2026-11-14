@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { createManagerApi, type ApiDeps } from "../src/core/api";
 import { loadSettings, type ManagerSettings } from "../src/core/model";
 import { MemorySecretStore } from "../src/vendor/kit/secrets";
-import { LLM_ENDPOINT_MANAGER_API_VERSION, type EndpointTransport } from "../src/core/api-types";
+import { LLM_ENDPOINT_MANAGER_API_VERSION, hasModelList, type EndpointTransport } from "../src/core/api-types";
 import { isLlmEndpointManagerApi } from "../src/vendor/kit/endpoint-source";
 
 function deps(initial: ManagerSettings, over: Partial<ApiDeps> = {}) {
@@ -61,6 +61,59 @@ describe("createManagerApi", () => {
     await api.models("a", { force: true });
     expect(listModels).toHaveBeenCalledTimes(2);
     expect(await api.models("nope")).toEqual({ error: "not-found" });
+  });
+  describe("modelList (additiv zu v1): Erreichbarkeit neben der Modellliste", () => {
+    it("gestoppter Server und Server ohne Liste liefern verschiedene Werte, models() bleibt in beiden Fällen []", async () => {
+      const down = deps(base(), { listModels: vi.fn(() => Promise.reject(new Error("ECONNREFUSED"))), probe: vi.fn(() => Promise.resolve(false)) });
+      const noList = deps(base(), { listModels: vi.fn(() => Promise.resolve([])), probe: vi.fn(() => Promise.resolve(true)) });
+      const a = createManagerApi(down.d).api; const b = createManagerApi(noList.d).api;
+      expect(await a.modelList("a")).toEqual({ models: [], reachable: false });
+      expect(await b.modelList("a")).toEqual({ models: [], reachable: true });
+      expect(await createManagerApi(down.d).api.models("a")).toEqual([]);
+      expect(await createManagerApi(noList.d).api.models("a")).toEqual([]);
+    });
+    it("mit Liste: sortiert und erreichbar ohne Probe; version bleibt 1; die Form des Kits ist weiter erfüllt", async () => {
+      const { d, probe } = deps(base());
+      const { api } = createManagerApi(d);
+      expect(await api.modelList("a")).toEqual({ models: ["a", "b"], reachable: true });
+      expect(probe).not.toHaveBeenCalled();
+      expect(api.version).toBe(1);
+      expect(isLlmEndpointManagerApi(api)).toBe(true);
+      expect(hasModelList(api)).toBe(true);
+    });
+    it("ein v1-Manager ohne die Methode wird erkannt (Rückfall auf models())", () => {
+      const old = { version: 1, list() { return []; }, get() { return null; }, resolve() { return Promise.resolve({ error: "no-endpoint" }); }, materialize() { return Promise.resolve({ error: "not-found" }); }, models() { return Promise.resolve([]); }, importEndpoints() { return Promise.resolve({ error: "no-endpoint" }); }, on() { return () => undefined; } };
+      expect(isLlmEndpointManagerApi(old)).toBe(true);
+      expect(hasModelList(old)).toBe(false);
+      expect(hasModelList(null)).toBe(false);
+    });
+    it("teilt Cache und force mit models(): ein Aufruf holt die Liste einmal, force lädt neu und verwirft die Erreichbarkeit der URL", async () => {
+      const { d, listModels, probe } = deps(base());
+      probe.mockResolvedValueOnce(false);
+      const { api } = createManagerApi(d);
+      expect(await api.resolve("chat")).toEqual({ error: "no-endpoint" });
+      await api.modelList("a"); await api.models("a");
+      expect(listModels).toHaveBeenCalledTimes(1);
+      await api.modelList("a", { force: true });
+      expect(listModels).toHaveBeenCalledTimes(2);
+      expect(await api.resolve("chat")).toMatchObject({ id: "a" });
+    });
+    it("Fehler sind Werte, wie bei models()", async () => {
+      const s = base(); s.endpoints[0]!.enabled = false;
+      const { api } = createManagerApi(deps(s).d);
+      expect(await api.modelList("nope")).toEqual({ error: "not-found" });
+      expect(await api.modelList("a")).toEqual({ error: "disabled" });
+      expect(await api.modelList("b")).toEqual({ error: "secret-missing" });
+    });
+    it("ein Server, der erst nach dem Start antwortet: nach force ist aus offline erreichbar geworden", async () => {
+      let up = false;
+      const { d } = deps(base(), { listModels: vi.fn(() => (up ? Promise.resolve(["m"]) : Promise.reject(new Error("down")))), probe: vi.fn(() => Promise.resolve(up)) });
+      const { api } = createManagerApi(d);
+      expect(await api.modelList("a")).toEqual({ models: [], reachable: false });
+      up = true;
+      expect(await api.modelList("a")).toEqual({ models: [], reachable: false });   // Cache hält, bis force
+      expect(await api.modelList("a", { force: true })).toEqual({ models: ["m"], reachable: true });
+    });
   });
   it("models(force) verwirft auch die Erreichbarkeit der URL, damit resolve() nicht bis zu 30 s bei no-endpoint bleibt", async () => {
     const { d, probe } = deps(base());

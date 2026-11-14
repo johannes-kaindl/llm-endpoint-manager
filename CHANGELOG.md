@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Plugin API: the new method `modelList(id, { force })` returns `{ models, reachable }`. Until now `models(id)` returned `[]` both for an endpoint that is switched off and for one that answers without a model list, so a model dropdown could not say "not reachable". The API version stays 1; the method is additive, and a plugin that does not know it keeps using `models(id)`, which behaves as before.
+
 ## [0.9.5] — 2026-11-12
 
 ### Changed

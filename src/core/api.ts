@@ -2,7 +2,7 @@ import { createModelListCache } from "../vendor/kit/model-list-cache";
 import type { SecretStore } from "../vendor/kit/secrets";
 import type { EndpointConfig } from "../vendor/kit/endpoint_config";
 import { normalizeEndpoint } from "../vendor/kit/endpoint";
-import { LLM_ENDPOINT_MANAGER_API_VERSION, type ApiEndpoint, type ApiError, type EndpointTransport, type ImportResult, type LlmEndpointManagerApi, type ResolvedEndpoint } from "./api-types";
+import { LLM_ENDPOINT_MANAGER_API_VERSION, type ApiEndpoint, type ApiError, type EndpointTransport, type ImportResult, type ManagerApi, type ModelListStatus, type ResolvedEndpoint } from "./api-types";
 import { byTransport } from "./list-ops";
 import { byCapability, importEndpoints } from "./list-ops";
 import { toPersisted, type Capability, type ManagedEndpoint, type ManagerSettings, type Provider } from "./model";
@@ -27,7 +27,7 @@ export interface ApiDeps {
 }
 
 export interface ManagerApiHandle {
-  api: LlmEndpointManagerApi;
+  api: ManagerApi;
   callers(): CallerRecord[];
   notifyChanged(): void;
   reachability: ReachabilityCache;
@@ -73,7 +73,7 @@ export function createManagerApi(deps: ApiDeps): ManagerApiHandle {
   const find = (id: string): ManagedEndpoint | undefined => deps.settings().endpoints.find((e) => e.id === id);
   const notifyChanged = (): void => { for (const cb of [...listeners]) { try { cb(); } catch { /* Fremd-Callback */ } } };
 
-  const api: LlmEndpointManagerApi = {
+  const api: ManagerApi = {
     version: LLM_ENDPOINT_MANAGER_API_VERSION,
     list(filter) { return byTransport(byCapability(deps.settings().endpoints, filter?.capability), filter?.transports).map((e) => toApiEndpoint(e, deps.secrets)); },
     get(id) { const e = find(id); return e ? toApiEndpoint(e, deps.secrets) : null; },
@@ -90,7 +90,7 @@ export function createManagerApi(deps: ApiDeps): ManagerApiHandle {
       const m = materialize(e, token);
       return "error" in m ? m : toResolved(m);
     },
-    async models(id, opts) {
+    async modelList(id, opts) {
       const e = find(id);
       if (!e) return { error: "not-found" };
       const m = materialize(e, token);
@@ -101,7 +101,11 @@ export function createManagerApi(deps: ApiDeps): ManagerApiHandle {
         listModels: () => deps.listModels(m, e.provider).catch(() => []),
         probe: () => safeProbe(m).then((reachable) => ({ reachable })),
       });
-      return [...r.models].sort();
+      return { models: [...r.models].sort(), reachable: r.reachable } satisfies ModelListStatus;
+    },
+    async models(id, opts) {
+      const r = await api.modelList(id, opts);
+      return "error" in r ? r : r.models;
     },
     async importEndpoints(eps: EndpointConfig[], capability) {
       const out = importEndpoints(deps.settings().endpoints, eps, capability, () => deps.mint(), (sid) => deps.secrets.has(sid));

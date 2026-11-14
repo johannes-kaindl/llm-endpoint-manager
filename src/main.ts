@@ -4,7 +4,7 @@ import { pickLang, setLang, t } from "./vendor/kit/i18n";
 import { MemorySecretStore, type SecretStore } from "./vendor/kit/secrets";
 import { obsidianSecretStore, secretStorageAvailable } from "./vendor/kit-obsidian/secrets";
 import { createManagerApi, type ManagerApiHandle } from "./core/api";
-import { LLM_ENDPOINT_MANAGER_PLUGIN_ID, type LlmEndpointManagerApi } from "./core/api-types";
+import { LLM_ENDPOINT_MANAGER_PLUGIN_ID, type ManagerApi } from "./core/api-types";
 import { orphanSecretIds } from "./core/list-ops";
 import { loadSettings, newId, secretIdOf, toPersisted, type ManagedEndpoint, type ManagerSettings } from "./core/model";
 import { dropEmbeddingOnChatModels } from "./core/embedding-check";
@@ -22,7 +22,7 @@ export default class LlmEndpointManagerPlugin extends Plugin {
   secrets: SecretStore = new MemorySecretStore();
   keychain = false;
   handle!: ManagerApiHandle;
-  api!: LlmEndpointManagerApi;
+  api!: ManagerApi;
   shortcutsBridge!: ShortcutsBridge;
 
   async onload(): Promise<void> {
