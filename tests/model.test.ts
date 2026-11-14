@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { DEFAULT_SETTINGS, labelFromUrl, loadSettings, normalizeEndpointEntry, secretIdOf, toPersisted, withProvider, type ManagedEndpoint } from "../src/core/model";
+import { validateEndpointInput } from "../src/vendor/kit/endpoint_diagnostics";
 
 const mint = (() => { let n = 0; return () => `id-${++n}`; })();
 
@@ -148,5 +149,21 @@ describe("Marke migrations.embeddingOnChatModels", () => {
     expect("migrations" in toPersisted(loadSettings({ endpoints: [] }))).toBe(false);
     expect("migrations" in loadSettings({ endpoints: [], migrations: { embeddingOnChatModels: "ja" } })).toBe(false);
     expect("migrations" in loadSettings({ endpoints: [], migrations: 3 })).toBe(false);
+  });
+});
+
+describe("0.0.0.0 als Zieladresse (Welle 34, Messung auf Windows/Linux/Handy steht aus)", () => {
+  const raw = { id: "dt", label: "Draw Things", url: "http://0.0.0.0:7860", provider: "a1111", capabilities: ["image"] };
+  it("die Adresse bleibt beim Laden, Speichern und Auflösen unverändert (Roundtrip-Treue), auch über Neustart", () => {
+    const loaded = loadSettings({ version: 1, endpoints: [raw] }, mint);
+    expect(loaded.endpoints[0]!.url).toBe("http://0.0.0.0:7860");
+    const again = loadSettings(JSON.parse(JSON.stringify(toPersisted(loaded))), mint);
+    expect(again.endpoints[0]!.url).toBe("http://0.0.0.0:7860");
+    withProvider(again.endpoints[0]!, "comfy");
+    expect(again.endpoints[0]!.url).toBe("http://0.0.0.0:7860");
+  });
+  it("die Warnung vor einer Platzhalter-Adresse gilt für 0.0.0.0 und nicht für 127.0.0.1", () => {
+    expect(validateEndpointInput("http://0.0.0.0:7860").some((w) => w.rule === "placeholder-ip")).toBe(true);
+    expect(validateEndpointInput("http://127.0.0.1:7860").some((w) => w.rule === "placeholder-ip")).toBe(false);
   });
 });
