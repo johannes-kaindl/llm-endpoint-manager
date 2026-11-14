@@ -79,6 +79,9 @@ const PUNKTE = [
 const { record, abschluss } = createBilanz({ punkte: PUNKTE });
 
 const q = (s: unknown): string => JSON.stringify(s);
+// `deleteSecret` statt `setSecret(id, "")`: das Leeren lässt den Meta-Eintrag im Schlüsselbund stehen (Task „Treiber-Skripte räumen ihren Platzhalter-Schlüssel nicht ab“).
+const SECRET_WEG = (idAusdruck: string): string =>
+  `{ const s = app.secretStorage; if (typeof s.deleteSecret === "function") await s.deleteSecret(${idAusdruck}); else await s.setSecret(${idAusdruck}, ""); }`;
 
 /** Fake-Server auf dem zentralen LLM-Stub; `stub.start()` belegt nach `close()` denselben Port (B3). */
 interface FakeServer { url: string; stub: LlmStub; close: () => Promise<void> }
@@ -231,7 +234,7 @@ async function main(): Promise<void> {
     await cdp.evaluate(`
       const p = app.plugins.plugins[${q(PLUGIN_ID)}];
       if (p) { p.settings.endpoints = []; await p.saveSettings(); }
-      ${activeSecretId ? `app.secretStorage.setSecret(${q(activeSecretId)}, "");` : ""}
+      ${activeSecretId ? SECRET_WEG(q(activeSecretId)) : ""}
       return true;
     `).catch(() => { console.log("  ! Aufraeumen im Renderer fehlgeschlagen — data.json/Schluesselbund von Hand pruefen"); });
   };
@@ -677,13 +680,16 @@ async function main(): Promise<void> {
       JSON.stringify({ before, cleanClicked, stillThere, confirmClicked, gone: gone !== null, after }),
     );
 
+    // Der Platzhalter von H1 wird vom Plugin gelöscht; scheitert H1, räumt dieser Aufruf auf (ohne Eintrag ein No-op).
+    await cdp.evaluate(`${SECRET_WEG(q(orphanId))} return true;`).catch(() => undefined);
+
     // --- I1-I3: Claude API (Welle 23) -----------------------------------------------------
     // Der LLM-Stub der Brücke im Anthropic-Modus stellt die Messages-API nach (strenge Pfade, Kopfzeilen, Schlüssel). Kein echter
     // Aufruf an api.anthropic.com: Kosten und Schlüssel (Auftrag Welle 23).
     console.log("\nI · Claude API");
     await cdp.evaluate(`
       const p = app.plugins.plugins[${q(PLUGIN_ID)}];
-      for (const e of p.settings.endpoints) if (e.secretId) app.secretStorage.setSecret(e.secretId, "");
+      for (const e of p.settings.endpoints) if (e.secretId) ${SECRET_WEG("e.secretId")}
       p.settings.endpoints = [];
       await p.saveSettings();
       return true;
@@ -793,7 +799,7 @@ async function main(): Promise<void> {
     // J1 — der Ablauf eines Nutzers mit echten Klicks: URL einer Zeile weiter unten ändern, dann ins Schlüsselfeld wechseln. Das
     // Übernehmen sperrt die Zeilen und baut sie neu; vorher sprang das Fenster und der Fokus ging verloren (Task „Fokus springt …“).
     await cdp.evaluate(`
-      app.secretStorage.setSecret(${q(`${PLUGIN_ID}-${claudeEp.id}`)}, "");
+      ${SECRET_WEG(q(`${PLUGIN_ID}-${claudeEp.id}`))}
       const p = app.plugins.plugins[${q(PLUGIN_ID)}];
       p.settings.endpoints = [1, 2, 3, 4].map((n) => ({ id: "j" + n, label: "J" + n, url: "http://localhost:" + (1240 + n), provider: "openai", capabilities: ["chat"], enabled: true }));
       p.handle.reachability.clear();

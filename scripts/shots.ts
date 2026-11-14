@@ -46,6 +46,9 @@ const CLOSED_PORT = 1237;
 const DEMO_TOKEN = "demo-token";
 
 const q = (s: unknown): string => JSON.stringify(s);
+// `deleteSecret` statt `setSecret(id, "")`: das Leeren lässt den Meta-Eintrag im Schlüsselbund stehen (Task „Treiber-Skripte räumen ihren Platzhalter-Schlüssel nicht ab“).
+const SECRET_WEG = (idAusdruck: string): string =>
+  `{ const s = app.secretStorage; if (typeof s.deleteSecret === "function") await s.deleteSecret(${idAusdruck}); else await s.setSecret(${idAusdruck}, ""); }`;
 
 // --- Fake-Server (zentraler LLM-Stub, feste Ports) -----------------------------------------
 type Fake = { close: () => Promise<void> };
@@ -110,7 +113,7 @@ async function cleanup(ws: Cdp): Promise<void> {
   await ws.evaluate(`
     const p = app.plugins.plugins[${q(PLUGIN_ID)}];
     if (p) { p.settings.endpoints = []; await p.saveSettings(); }
-    app.secretStorage.setSecret(${q(`${PLUGIN_ID}-demo-office`)}, "");
+    ${SECRET_WEG(q(`${PLUGIN_ID}-demo-office`))}
     return true;
   `).catch(() => { console.log("  ! Aufraeumen fehlgeschlagen — data.json und Schluesselbund von Hand pruefen"); });
 }
